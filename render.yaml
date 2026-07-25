@@ -31,8 +31,9 @@ services:
         sync: false
 
   # Frontend Static Site Service
-  - type: static
+  - type: web
     name: aashram-frontend
+    runtime: static
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
