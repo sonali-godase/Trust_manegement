@@ -1,9 +1,10 @@
 const fs = require('fs');
+const path = require('path');
 
 exports.drawJamaPavti = (ctx) => {
   const {
     doc, donation, copyTitle, yOffset,
-    logoPath, receiptNo, dateStr,
+    logoPath, swamijiPath, receiptNo, dateStr,
     amountMarathi, amountEnglish,
     setBoldFont, setRegularFont
   } = ctx;
