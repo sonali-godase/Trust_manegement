@@ -433,6 +433,9 @@ const Announcements = () => {
                     return Math.floor(seconds) + "s ago";
                   };
 
+                  const creatorId = ann.createdBy?._id || ann.createdBy;
+                  const isMine = Boolean(creatorId && user?._id && String(creatorId) === String(user._id));
+
                   return (
                     <motion.div 
                       key={ann._id} 
