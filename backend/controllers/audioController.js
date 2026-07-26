@@ -9,16 +9,29 @@ const crypto = require('crypto');
 // Helper to upload a local file to Cloudinary
 const uploadToCloudinary = async (filePath, resourceType = 'auto') => {
   try {
-    const result = await cloudinary.uploader.upload(filePath, {
-      resource_type: resourceType,
-      folder: 'aashram_audio',
-    });
-    return result.secure_url;
+    const cloudinaryInstance = await cloudinary.getCloudinary();
+    if (cloudinaryInstance) {
+      const result = await cloudinaryInstance.uploader.upload(filePath, {
+        resource_type: resourceType,
+        folder: 'aashram_audio',
+      });
+      return result.secure_url;
+    } else {
+      console.log("Cloudinary not configured. Falling back to local static URL.");
+    }
   } catch (error) {
-    console.error("Cloudinary upload error:", error);
-    throw error;
+    console.error("Cloudinary upload error, falling back to local static URL:", error.message);
   }
+
+  // Return local static path as fallback
+  const filename = path.basename(filePath);
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  if (normalizedPath.includes('/uploads/documents/')) {
+    return `/uploads/documents/${filename}`;
+  }
+  return `/uploads/${filename}`;
 };
+
 
 exports.importFromYoutube = async (req, res) => {
   try {
@@ -66,7 +79,9 @@ exports.importFromYoutube = async (req, res) => {
     if (vttFile) {
       const vttPath = path.join(tempSubDir, vttFile);
       lyricsDataUrl = await uploadToCloudinary(vttPath, 'raw');
-      fs.unlinkSync(vttPath); // Clean up
+      if (lyricsDataUrl.startsWith('http')) {
+        try { fs.unlinkSync(vttPath); } catch (e) {}
+      }
     } else {
       // Fallback: Generate Lyrics using Deepgram API
       try {
@@ -76,15 +91,17 @@ exports.importFromYoutube = async (req, res) => {
           const vttPath = path.join(tempSubDir, `deepgram-lyrics-${Date.now()}.vtt`);
           fs.writeFileSync(vttPath, vttContent);
           lyricsDataUrl = await uploadToCloudinary(vttPath, 'raw');
-          try { fs.unlinkSync(vttPath); } catch (e) {}
+          if (lyricsDataUrl.startsWith('http')) {
+            try { fs.unlinkSync(vttPath); } catch (e) {}
+          }
         }
       } catch (err) {
         console.error("Deepgram transcription error:", err.message);
       }
     }
 
-    // Clean up audio
-    if (fs.existsSync(actualAudioPath)) {
+    // Clean up audio if uploaded to Cloudinary
+    if (audioUrl.startsWith('http') && fs.existsSync(actualAudioPath)) {
       fs.unlinkSync(actualAudioPath);
     }
 
@@ -92,7 +109,9 @@ exports.importFromYoutube = async (req, res) => {
     let thumbnailUrl = '';
     if (thumbnailFile) {
       thumbnailUrl = await uploadToCloudinary(thumbnailFile.path, 'image');
-      try { fs.unlinkSync(thumbnailFile.path); } catch (e) {}
+      if (thumbnailUrl.startsWith('http')) {
+        try { fs.unlinkSync(thumbnailFile.path); } catch (e) {}
+      }
     }
 
     // 4. Save to DB
@@ -137,10 +156,10 @@ exports.uploadDirect = async (req, res) => {
       thumbnailUrl = await uploadToCloudinary(thumbnailFile.path, 'image');
     }
     
-    // Clean up local files safely
+    // Clean up local files safely if they were uploaded to Cloudinary
     try {
-      if (fs.existsSync(audioFile.path)) fs.unlinkSync(audioFile.path);
-      if (thumbnailFile && fs.existsSync(thumbnailFile.path)) fs.unlinkSync(thumbnailFile.path);
+      if (audioUrl.startsWith('http') && fs.existsSync(audioFile.path)) fs.unlinkSync(audioFile.path);
+      if (thumbnailFile && thumbnailUrl.startsWith('http') && fs.existsSync(thumbnailFile.path)) fs.unlinkSync(thumbnailFile.path);
     } catch (err) {
       console.warn("Failed to clean up local files:", err.message);
     }
@@ -154,7 +173,9 @@ exports.uploadDirect = async (req, res) => {
             const vttPath = path.join(__dirname, '../uploads', `lyrics-${Date.now()}.vtt`);
             fs.writeFileSync(vttPath, vttContent);
             lyricsDataUrl = await uploadToCloudinary(vttPath, 'raw');
-            try { fs.unlinkSync(vttPath); } catch (e) {}
+            if (lyricsDataUrl.startsWith('http')) {
+                try { fs.unlinkSync(vttPath); } catch (e) {}
+            }
         }
       } else {
         console.warn("DEEPGRAM_API_KEY missing, skipping transcription.");
@@ -234,7 +255,9 @@ exports.updateTrack = async (req, res) => {
     if (req.file) {
       const thumbnailUrl = await uploadToCloudinary(req.file.path, 'image');
       track.thumbnailUrl = thumbnailUrl;
-      try { fs.unlinkSync(req.file.path); } catch (e) {}
+      if (thumbnailUrl.startsWith('http')) {
+        try { fs.unlinkSync(req.file.path); } catch (e) {}
+      }
     }
 
     await track.save();

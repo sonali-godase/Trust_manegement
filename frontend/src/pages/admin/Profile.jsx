@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { FiUser, FiMail, FiPhone, FiMapPin, FiShield, FiSave, FiEdit2, FiCamera, FiLock, FiBell, FiEye, FiEyeOff } from 'react-icons/fi';
+import { FiUser, FiMail, FiPhone, FiMapPin, FiShield, FiSave, FiEdit2, FiCamera, FiLock, FiBell, FiEye, FiEyeOff, FiSettings } from 'react-icons/fi';
 import { Globe, Clock, Activity, ChevronDown } from 'lucide-react';
 import api from '../../utils/api';
 
@@ -38,6 +38,62 @@ const AdminProfile = () => {
     language: 'English',
     showActivities: true, showBranches: true, showDonations: true
   });
+
+  const [systemSettings, setSystemSettings] = useState({
+    adminLoginPin: '',
+    cloudinaryCloudName: '',
+    cloudinaryApiKey: '',
+    cloudinaryApiSecret: ''
+  });
+  const [showAdminPin, setShowAdminPin] = useState(false);
+  const [showCloudinarySecret, setShowCloudinarySecret] = useState(false);
+
+  const fetchSystemSettings = async () => {
+    try {
+      const res = await api.get('/admins/settings');
+      if (res.data.success) {
+        setSystemSettings({
+          adminLoginPin: res.data.data.adminLoginPin || '',
+          cloudinaryCloudName: res.data.data.cloudinaryCloudName || '',
+          cloudinaryApiKey: res.data.data.cloudinaryApiKey || '',
+          cloudinaryApiSecret: res.data.data.cloudinaryApiSecret || ''
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch system settings", err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'systemSettings') {
+      fetchSystemSettings();
+    }
+  }, [activeTab]);
+
+  const handleUpdateSystemSettings = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setSuccessMsg('');
+    try {
+      const res = await api.put('/admins/settings', systemSettings);
+      if (res.data.success) {
+        setSuccessMsg('System settings saved successfully!');
+        setSystemSettings({
+          adminLoginPin: res.data.data.adminLoginPin || '',
+          cloudinaryCloudName: res.data.data.cloudinaryCloudName || '',
+          cloudinaryApiKey: res.data.data.cloudinaryApiKey || '',
+          cloudinaryApiSecret: res.data.data.cloudinaryApiSecret || ''
+        });
+      } else {
+        alert(res.data.message || 'Failed to update system settings.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Failed to update system settings.');
+    } finally {
+      setLoading(false);
+    }
+  };
   
   useEffect(() => {
     const savedPrefs = localStorage.getItem('adminPreferences');
@@ -249,6 +305,12 @@ const AdminProfile = () => {
             >
               <FiBell className="text-lg" /> Preferences
             </button>
+            <button 
+              onClick={() => {setActiveTab('systemSettings'); setSuccessMsg(''); setIsEditing(false);}}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-colors ${activeTab === 'systemSettings' ? 'bg-sky-50 text-sky-600' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}`}
+            >
+              <FiSettings className="text-lg" /> System Settings
+            </button>
           </nav>
         </div>
 
@@ -412,6 +474,109 @@ const AdminProfile = () => {
 
                   {/* Removed Date & Time Section */}
                 </div>
+              </motion.div>
+            )}
+
+            {/* System Settings Tab */}
+            {activeTab === 'systemSettings' && (
+              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }} className="space-y-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-100 pb-6 mb-6 gap-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">System Settings</h2>
+                    <p className="text-gray-500 mt-1">Configure global application variables and credentials.</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleUpdateSystemSettings} className="space-y-6 max-w-xl">
+                  {/* Admin Login PIN */}
+                  <div className="bg-gray-50/50 rounded-2xl p-6 border border-gray-100 space-y-4">
+                    <h3 className="text-md font-bold text-gray-900 flex items-center gap-2">
+                      <FiLock className="text-sky-500" /> Admin Security Settings
+                    </h3>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Admin Login PIN</label>
+                      <div className="relative">
+                        <input
+                          type={showAdminPin ? "text" : "password"}
+                          required
+                          value={systemSettings.adminLoginPin}
+                          onChange={e => setSystemSettings({...systemSettings, adminLoginPin: e.target.value})}
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all font-medium"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAdminPin(!showAdminPin)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          {showAdminPin ? <FiEyeOff /> : <FiEye />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cloudinary Config */}
+                  <div className="bg-gray-50/50 rounded-2xl p-6 border border-gray-100 space-y-4">
+                    <h3 className="text-md font-bold text-gray-900 flex items-center gap-2">
+                      <Globe className="text-sky-500 w-5 h-5" /> Cloudinary Configuration
+                    </h3>
+                    
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Cloud Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. dkciljoot"
+                        value={systemSettings.cloudinaryCloudName}
+                        onChange={e => setSystemSettings({...systemSettings, cloudinaryCloudName: e.target.value})}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all font-medium"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">API Key</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 341723512741569"
+                        value={systemSettings.cloudinaryApiKey}
+                        onChange={e => setSystemSettings({...systemSettings, cloudinaryApiKey: e.target.value})}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all font-medium"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">API Secret</label>
+                      <div className="relative">
+                        <input
+                          type={showCloudinarySecret ? "text" : "password"}
+                          placeholder="Your Cloudinary API Secret"
+                          value={systemSettings.cloudinaryApiSecret}
+                          onChange={e => setSystemSettings({...systemSettings, cloudinaryApiSecret: e.target.value})}
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all font-medium"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCloudinarySecret(!showCloudinarySecret)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          {showCloudinarySecret ? <FiEyeOff /> : <FiEye />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full md:w-auto px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold shadow-md transition-colors flex justify-center items-center gap-2 disabled:opacity-50"
+                    >
+                      {loading ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <><FiSave /> Save Settings</>
+                      )}
+                    </button>
+                  </div>
+                </form>
               </motion.div>
             )}
 

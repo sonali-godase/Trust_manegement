@@ -1,4 +1,5 @@
 const Admin = require("../models/Admin");
+const SystemSettings = require("../models/SystemSettings");
 const Trustee = require("../models/Trustee");
 const Devotee = require("../models/Devotee");
 const BranchManager = require("../models/BranchManager");
@@ -358,3 +359,44 @@ exports.getAllDocuments = async (req, res) => {
 
 
 exports.getAllAdmins = async (req, res) => { try { const admins = await require('../models/Admin').find().select('-password'); res.json({ success: true, data: admins }); } catch (err) { res.status(500).json({ success: false }); } };
+
+// Get System Settings
+exports.getSystemSettings = async (req, res) => {
+  try {
+    let settings = await SystemSettings.findOne();
+    if (!settings) {
+      settings = await SystemSettings.create({
+        adminLoginPin: 'log1008',
+        cloudinaryCloudName: '',
+        cloudinaryApiKey: '',
+        cloudinaryApiSecret: ''
+      });
+    }
+    res.status(200).json({ success: true, data: settings });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Update System Settings
+exports.updateSystemSettings = async (req, res) => {
+  try {
+    const { adminLoginPin, cloudinaryCloudName, cloudinaryApiKey, cloudinaryApiSecret } = req.body;
+    
+    let settings = await SystemSettings.findOne();
+    if (!settings) {
+      settings = new SystemSettings({});
+    }
+
+    if (adminLoginPin !== undefined) settings.adminLoginPin = adminLoginPin;
+    if (cloudinaryCloudName !== undefined) settings.cloudinaryCloudName = cloudinaryCloudName;
+    if (cloudinaryApiKey !== undefined) settings.cloudinaryApiKey = cloudinaryApiKey;
+    if (cloudinaryApiSecret !== undefined) settings.cloudinaryApiSecret = cloudinaryApiSecret;
+
+    await settings.save();
+    
+    res.status(200).json({ success: true, message: "System settings updated successfully", data: settings });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};

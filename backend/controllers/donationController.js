@@ -89,11 +89,22 @@ exports.createDonation = async (req, res) => {
 
     let screenshotUrl = null;
     if (req.file) {
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: "trust_donations",
-      });
-      screenshotUrl = result.secure_url;
-      fs.unlinkSync(req.file.path);
+      const cloudinaryInstance = await cloudinary.getCloudinary();
+      if (cloudinaryInstance) {
+        try {
+          const result = await cloudinaryInstance.uploader.upload(req.file.path, {
+            folder: "trust_donations",
+          });
+          screenshotUrl = result.secure_url;
+          fs.unlinkSync(req.file.path);
+        } catch (uploadError) {
+          console.error("Cloudinary upload failed, falling back to local static URL:", uploadError.message);
+          screenshotUrl = `/uploads/${req.file.filename}`;
+        }
+      } else {
+        console.log("Cloudinary not configured, falling back to local static URL.");
+        screenshotUrl = `/uploads/${req.file.filename}`;
+      }
     }
 
     let donationReference;
@@ -227,11 +238,22 @@ exports.submitPayment = async (req, res) => {
     let screenshotUrl = donation.screenshotUrl;
 
     if (req.file) {
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: "trust_donations",
-      });
-      screenshotUrl = result.secure_url;
-      fs.unlinkSync(req.file.path);
+      const cloudinaryInstance = await cloudinary.getCloudinary();
+      if (cloudinaryInstance) {
+        try {
+          const result = await cloudinaryInstance.uploader.upload(req.file.path, {
+            folder: "trust_donations",
+          });
+          screenshotUrl = result.secure_url;
+          fs.unlinkSync(req.file.path);
+        } catch (uploadError) {
+          console.error("Cloudinary upload failed, falling back to local static URL:", uploadError.message);
+          screenshotUrl = `/uploads/${req.file.filename}`;
+        }
+      } else {
+        console.log("Cloudinary not configured, falling back to local static URL.");
+        screenshotUrl = `/uploads/${req.file.filename}`;
+      }
     }
 
     donation.utrNumber = utrNumber;

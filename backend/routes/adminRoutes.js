@@ -32,4 +32,9 @@ router.get("/documents", adminController.getAllDocuments);
 
 router.get('/admins-list', adminController.getAllAdmins);
 
+// System Settings
+router.get("/settings", adminController.getSystemSettings);
+router.put("/settings", adminController.updateSystemSettings);
+
 module.exports = router;
+
