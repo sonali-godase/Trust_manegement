@@ -25,20 +25,7 @@ const controller     = require("../controllers/userDashboardController");
 
 // ─── Multer config for profile photo uploads ─────────────────────────────────
 
-const profileUploadDir = path.join(__dirname, "..", "uploads", "profiles");
-
-// Ensure directory exists
-if (!fs.existsSync(profileUploadDir)) {
-  fs.mkdirSync(profileUploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, profileUploadDir),
-  filename: (req, file, cb) => {
-    const uniqueName = `profile_${req.user._id}_${Date.now()}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
-  },
-});
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage,

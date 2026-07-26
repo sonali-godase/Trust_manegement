@@ -9,15 +9,10 @@ const cloudinary = require("../config/cloudinary");
  * @param {Object} options - Additional options (resourceType, unlinkAfterUpload, etc.)
  * @returns {Promise<{ url: string, publicId: string } | null>}
  */
-const uploadToCloudinary = async (filePath, folder = "uploads", options = {}) => {
-  if (!filePath || !fs.existsSync(filePath)) {
-    return null;
-  }
+const uploadToCloudinary = async (fileInput, folder = "uploads", options = {}) => {
+  if (!fileInput) return null;
 
-  const {
-    resourceType = "auto",
-    unlinkAfterUpload = true
-  } = options;
+  const { resourceType = "auto" } = options;
 
   try {
     const cloudinaryInstance = await cloudinary.getCloudinary();
@@ -31,23 +26,47 @@ const uploadToCloudinary = async (filePath, folder = "uploads", options = {}) =>
       resource_type: resourceType
     };
 
-    const result = await cloudinaryInstance.uploader.upload(filePath, uploadOptions);
+    // Case 1: Multer file object with buffer (memory storage) or raw Buffer
+    const isBuffer = Buffer.isBuffer(fileInput) || (fileInput && fileInput.buffer && Buffer.isBuffer(fileInput.buffer));
+    const buffer = Buffer.isBuffer(fileInput) ? fileInput : (fileInput && fileInput.buffer);
 
-    if (unlinkAfterUpload && fs.existsSync(filePath)) {
-      try {
-        fs.unlinkSync(filePath);
-      } catch (err) {
-        console.error("Failed to delete temp file after Cloudinary upload:", err.message);
-      }
+    if (isBuffer && buffer) {
+      return new Promise((resolve) => {
+        const stream = cloudinaryInstance.uploader.upload_stream(
+          uploadOptions,
+          (error, result) => {
+            if (error) {
+              console.error("Cloudinary upload_stream error:", error.message);
+              return resolve(null);
+            }
+            resolve({
+              url: result.secure_url,
+              publicId: result.public_id,
+              resourceType: result.resource_type
+            });
+          }
+        );
+        stream.end(buffer);
+      });
     }
 
-    return {
-      url: result.secure_url,
-      publicId: result.public_id
-    };
+    // Case 2: File path string or Multer file object with .path
+    const filePath = typeof fileInput === "string" ? fileInput : fileInput?.path;
+    if (filePath && fs.existsSync(filePath)) {
+      const result = await cloudinaryInstance.uploader.upload(filePath, uploadOptions);
+      if (options.unlinkAfterUpload !== false) {
+        try { fs.unlinkSync(filePath); } catch (e) {}
+      }
+      return {
+        url: result.secure_url,
+        publicId: result.public_id,
+        resourceType: result.resource_type
+      };
+    }
+
+    return null;
   } catch (error) {
     console.error("Cloudinary upload error:", error.message);
-    // Return null on failure so callers can safely fallback to local storage path
     return null;
   }
 };

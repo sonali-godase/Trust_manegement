@@ -423,12 +423,12 @@ exports.updateProfile = async (req, res) => {
       if (oldPublicId) {
         await deleteFromCloudinary(oldPublicId);
       }
-      const uploadRes = await uploadToCloudinary(file.path, "profiles", { resourceType: "image" });
+      const uploadRes = await uploadToCloudinary(file, "profiles", { resourceType: "image" });
       if (uploadRes) {
         admin.profilePhoto = uploadRes.url;
         admin.profilePhotoPublicId = uploadRes.publicId;
       } else {
-        admin.profilePhoto = `/uploads/${file.filename}`;
+        return res.status(400).json({ success: false, message: "Cloudinary upload failed. Please verify Cloudinary configuration." });
       }
     }
 
