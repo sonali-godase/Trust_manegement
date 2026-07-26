@@ -407,7 +407,13 @@ const Announcements = () => {
             {paginatedData.length === 0 ? (
               <div className="text-center py-20 bg-white rounded-2xl border border-gray-100 shadow-sm">
                 <FiBell className="mx-auto text-4xl text-gray-300 mb-4" />
-                <p className="text-gray-500 font-medium">No announcements found.</p>
+                <p className="text-gray-500 font-medium mb-4">No announcements found.</p>
+                <button 
+                  onClick={handleOpenNew}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow transition-all"
+                >
+                  <FiPlus /> New Announcement
+                </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-4">
@@ -572,7 +578,7 @@ const Announcements = () => {
 
       {/* CREATE ANNOUNCEMENT MODAL */}
       <AnimatePresence>
-        {isModalOpen && createPortal(
+        {isModalOpen && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 overflow-y-auto bg-slate-900/60 backdrop-blur-sm">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }} 
@@ -800,8 +806,7 @@ const Announcements = () => {
                 </div>
               </div>
             </motion.div>
-          </div>,
-          document.body
+          </div>
         )}
       </AnimatePresence>
 

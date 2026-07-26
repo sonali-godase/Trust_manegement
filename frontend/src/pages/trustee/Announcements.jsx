@@ -572,7 +572,7 @@ const Announcements = () => {
 
       {/* CREATE ANNOUNCEMENT MODAL */}
       <AnimatePresence>
-        {isModalOpen && createPortal(
+        {isModalOpen && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 overflow-y-auto bg-slate-900/60 backdrop-blur-sm">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }} 
@@ -800,8 +800,7 @@ const Announcements = () => {
                 </div>
               </div>
             </motion.div>
-          </div>,
-          document.body
+          </div>
         )}
       </AnimatePresence>
 
