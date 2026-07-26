@@ -34,7 +34,10 @@ export const Settings = () => {
             mobile: u.mobile || ''
           });
           if (u.profilePhoto) {
-            setPhotoPreview(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${u.profilePhoto}`);
+            const photoUrl = u.profilePhoto.startsWith('http') 
+              ? u.profilePhoto 
+              : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${u.profilePhoto.startsWith('/') ? '' : '/'}${u.profilePhoto}`;
+            setPhotoPreview(photoUrl);
           }
         }
       } catch (err) {
@@ -110,7 +113,10 @@ export const Settings = () => {
 
         // Update photo preview link
         if (updatedUser.profilePhoto) {
-          setPhotoPreview(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${updatedUser.profilePhoto}`);
+          const photoUrl = updatedUser.profilePhoto.startsWith('http') 
+            ? updatedUser.profilePhoto 
+            : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${updatedUser.profilePhoto.startsWith('/') ? '' : '/'}${updatedUser.profilePhoto}`;
+          setPhotoPreview(photoUrl);
         }
       }
     } catch (err) {

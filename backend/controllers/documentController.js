@@ -1,6 +1,7 @@
 const Document = require("../models/Document");
 const path = require("path");
 const fs = require("fs");
+const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require("../utils/cloudinaryHelper");
 
 exports.createDocument = async (req, res) => {
   try {
@@ -10,16 +11,18 @@ exports.createDocument = async (req, res) => {
 
     const { title, description, category } = req.body;
     
-    // Create URL path for database
-    // Path will be like /uploads/documents/doc-123.pdf
-    const fileUrl = `/uploads/documents/${req.file.filename}`;
+    const uploadRes = await uploadToCloudinary(req.file.path, "documents", { resourceType: "auto" });
+    if (!uploadRes) {
+      return res.status(500).json({ success: false, message: "Failed to upload document to Cloudinary" });
+    }
 
     const document = new Document({
       title,
       description,
       category,
       pdfName: req.file.originalname,
-      pdfUrl: fileUrl,
+      pdfUrl: uploadRes.url,
+      cloudinaryPublicId: uploadRes.publicId,
       fileSize: req.file.size,
       uploadedBy: req.user._id,
       branch: req.body.branchId || undefined // Use branchId from body if provided
@@ -107,22 +110,26 @@ exports.updateDocument = async (req, res) => {
     // document.branch is strictly bound to req.user.branch
 
     if (req.file) {
-      // Delete old file
-      const oldFilePath = path.join(__dirname, "..", document.pdfUrl);
-      if (fs.existsSync(oldFilePath)) {
-        fs.unlinkSync(oldFilePath);
+      // Delete old asset from Cloudinary
+      const oldPublicId = document.cloudinaryPublicId || extractPublicId(document.pdfUrl);
+      if (oldPublicId) {
+        await deleteFromCloudinary(oldPublicId, "raw");
+        await deleteFromCloudinary(oldPublicId, "image");
       }
 
-      // Update with new file
-      document.pdfName = req.file.originalname;
-      document.pdfUrl = `/uploads/documents/${req.file.filename}`;
-      document.fileSize = req.file.size;
+      const uploadRes = await uploadToCloudinary(req.file.path, "documents", { resourceType: "auto" });
+      if (uploadRes) {
+        document.pdfName = req.file.originalname;
+        document.pdfUrl = uploadRes.url;
+        document.cloudinaryPublicId = uploadRes.publicId;
+        document.fileSize = req.file.size;
+      }
     }
 
     await document.save();
     res.json({ success: true, document });
   } catch (error) {
-    if (req.file) fs.unlinkSync(req.file.path);
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -142,10 +149,11 @@ exports.deleteDocument = async (req, res) => {
       return res.json({ success: true, message: "Deletion request submitted to Trustee. Waiting for approval." });
     }
 
-    // Delete file if approved
-    const filePath = path.join(__dirname, "..", document.pdfUrl);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    // Delete file from Cloudinary if approved
+    const publicId = document.cloudinaryPublicId || extractPublicId(document.pdfUrl);
+    if (publicId) {
+      await deleteFromCloudinary(publicId, "raw");
+      await deleteFromCloudinary(publicId, "image");
     }
 
     await document.deleteOne();
@@ -185,10 +193,11 @@ exports.approveDocumentDeletion = async (req, res) => {
     const hasTrusteeApproval = document.deletionApprovals.some(a => a.role === 'Trustee');
 
     if (hasAdminApproval && hasTrusteeApproval) {
-      // Threshold met, delete document
-      const filePath = path.join(__dirname, "..", document.pdfUrl);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+      // Threshold met, delete document from Cloudinary
+      const publicId = document.cloudinaryPublicId || extractPublicId(document.pdfUrl);
+      if (publicId) {
+        await deleteFromCloudinary(publicId, "raw");
+        await deleteFromCloudinary(publicId, "image");
       }
       await document.deleteOne();
       return res.json({ success: true, message: "Deletion fully approved. Document deleted." });

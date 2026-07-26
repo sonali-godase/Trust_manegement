@@ -6,6 +6,14 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { useTableFeatures } from '../../hooks/useTableFeatures';
 import TablePagination from '../../components/TablePagination';
 
+const getDocUrl = (url) => {
+  if (!url) return "#";
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  const cleanUrl = url.replace(/\\/g, "/");
+  const assetsUrl = import.meta.env.VITE_ASSETS_URL || "http://localhost:5000";
+  return `${assetsUrl}${cleanUrl.startsWith("/") ? "" : "/"}${cleanUrl}`;
+};
+
 const Documents = () => {
   const [documents, setDocuments] = useState([]);
   const [deletionRequests, setDeletionRequests] = useState([]);
@@ -216,7 +224,7 @@ const Documents = () => {
 
                   <div className="flex gap-2 relative z-10 pt-4 border-t border-gray-100">
                     <a 
-                      href={`${import.meta.env.VITE_ASSETS_URL || 'http://localhost:5000'}${(doc.pdfUrl || '').replace(/\\/g, '/')}`}
+                      href={getDocUrl(doc.pdfUrl)}
                       target="_blank" rel="noopener noreferrer"
                       download
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-black border border-black text-white hover:bg-gray-900 hover:border-gray-900 rounded-xl transition-all text-sm font-black shadow-md hover:shadow-lg"
@@ -224,7 +232,7 @@ const Documents = () => {
                       <FiDownload /> Download
                     </a>
                     <a 
-                      href={`${import.meta.env.VITE_ASSETS_URL || 'http://localhost:5000'}${(doc.pdfUrl || '').startsWith('/') ? '' : '/'}${(doc.pdfUrl || '').replace(/\\/g, '/')}`}
+                      href={getDocUrl(doc.pdfUrl)}
                       target="_blank" rel="noopener noreferrer"
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-white border border-gray-900 text-black hover:bg-gray-100 rounded-xl transition-all text-sm font-black shadow-md hover:shadow-lg"
                     >
@@ -319,7 +327,7 @@ const Documents = () => {
                           <div className="flex items-center justify-end gap-2">
                             {req.documentData?.pdfUrl && (
                               <a 
-                                href={`${import.meta.env.VITE_ASSETS_URL || 'http://localhost:5000'}${req.documentData.pdfUrl}`} 
+                                href={getDocUrl(req.documentData.pdfUrl)} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
                                 className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-bold"

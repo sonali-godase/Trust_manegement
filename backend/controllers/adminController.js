@@ -400,3 +400,46 @@ exports.updateSystemSettings = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// Update Admin Self Profile
+exports.updateProfile = async (req, res) => {
+  try {
+    const { name, email, mobile, address } = req.body;
+    const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require("../utils/cloudinaryHelper");
+
+    const admin = await Admin.findById(req.user._id);
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Admin not found" });
+    }
+
+    if (name) admin.name = name;
+    if (email) admin.email = email;
+    if (mobile) admin.mobile = mobile;
+    if (address) admin.address = address;
+
+    const file = req.file || (req.files && (req.files.profileImage?.[0] || req.files.profilePhoto?.[0]));
+    if (file) {
+      const oldPublicId = admin.profilePhotoPublicId || extractPublicId(admin.profilePhoto);
+      if (oldPublicId) {
+        await deleteFromCloudinary(oldPublicId);
+      }
+      const uploadRes = await uploadToCloudinary(file.path, "profiles", { resourceType: "image" });
+      if (uploadRes) {
+        admin.profilePhoto = uploadRes.url;
+        admin.profilePhotoPublicId = uploadRes.publicId;
+      } else {
+        admin.profilePhoto = `/uploads/${file.filename}`;
+      }
+    }
+
+    await admin.save();
+
+    const userResponse = admin.toObject();
+    delete userResponse.password;
+
+    res.status(200).json({ success: true, message: "Profile updated successfully", data: userResponse, user: userResponse });
+  } catch (err) {
+    console.error("[adminController][ERROR] updateProfile:", err.message);
+    res.status(500).json({ success: false, message: err.message || "Failed to update profile." });
+  }
+};

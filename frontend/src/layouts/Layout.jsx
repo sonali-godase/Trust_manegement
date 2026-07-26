@@ -28,6 +28,13 @@ import {
 } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 
+const getProfilePhoto = (url) => {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  const baseUrl = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api$/, "");
+  return `${baseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
+};
+
 const Layout = ({ children, user }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -431,7 +438,7 @@ const Layout = ({ children, user }) => {
               <div className="w-10 h-10 rounded-full bg-[#0EA5E9] flex items-center justify-center text-white font-bold text-lg shrink-0 overflow-hidden">
                 {user?.profilePhoto ? (
                   <img
-                    src={`${import.meta.env.VITE_API_URL || "http://localhost:5000"}${user.profilePhoto}`}
+                    src={getProfilePhoto(user.profilePhoto)}
                     alt="Profile"
                     className="w-full h-full object-cover"
                   />
@@ -521,7 +528,7 @@ const Layout = ({ children, user }) => {
               >
                 {user?.profilePhoto ? (
                   <img
-                    src={`${import.meta.env.VITE_API_URL || "http://localhost:5000"}${user.profilePhoto}`}
+                    src={getProfilePhoto(user.profilePhoto)}
                     alt="Profile"
                     className="w-full h-full object-cover"
                   />

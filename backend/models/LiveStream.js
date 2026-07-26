@@ -18,9 +18,17 @@ const liveStreamSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  videoFilePublicId: {
+    type: String,
+    default: ''
+  },
   thumbnail: {
     type: String,
     trim: true
+  },
+  thumbnailPublicId: {
+    type: String,
+    default: ''
   },
   isLive: {
     type: Boolean,

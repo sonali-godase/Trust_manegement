@@ -45,8 +45,10 @@ const Profile = () => {
         address: user.address || ''
       });
       if (user.profilePhoto) {
-        const baseUrl = API_URL.replace(/\/api$/, '');
-        setImagePreview(`${baseUrl}${user.profilePhoto}`);
+        const photoUrl = user.profilePhoto.startsWith('http') 
+          ? user.profilePhoto 
+          : `${API_URL.replace(/\/api$/, '')}${user.profilePhoto.startsWith('/') ? '' : '/'}${user.profilePhoto}`;
+        setImagePreview(photoUrl);
       }
     }
   }, [user]);
@@ -126,7 +128,7 @@ const Profile = () => {
                  <input type="file" onChange={handleImageChange} className="hidden" accept="image/*" />
               </label>
               {(imagePreview || user?.profilePhoto) ? (
-                <img src={imagePreview || `${API_URL.replace(/\/api$/, '')}${user.profilePhoto}`} alt="Profile" className="w-full h-full object-cover" />
+                 <img src={imagePreview || (user.profilePhoto?.startsWith('http') ? user.profilePhoto : `${API_URL.replace(/\/api$/, '')}${user.profilePhoto}`)} alt="Profile" className="w-full h-full object-cover" />
               ) : (
                 <span className="text-4xl font-bold text-indigo-300">{formData.fullName.charAt(0) || 'A'}</span>
               )}

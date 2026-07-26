@@ -184,7 +184,7 @@ const UserDocuments = () => {
                       {likes[doc._id] > 0 && <span className="text-sm font-bold text-red-500">{likes[doc._id]}</span>}
                     </button>
                     <a 
-                      href={doc.fileUrl !== '#' ? `${import.meta.env.VITE_ASSETS_URL || 'http://localhost:5000'}${doc.fileUrl}` : '#'} 
+                      href={doc.fileUrl && doc.fileUrl !== '#' ? (doc.fileUrl.startsWith('http') ? doc.fileUrl : `${import.meta.env.VITE_ASSETS_URL || 'http://localhost:5000'}${doc.fileUrl.startsWith('/') ? '' : '/'}${doc.fileUrl}`) : '#'} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="flex flex-1 items-center justify-center gap-2 py-3 bg-smoke border border-gray-200 rounded-xl text-caramel-deep font-bold hover:bg-primary hover:text-caramel-deep hover:border-primary transition-all duration-300"

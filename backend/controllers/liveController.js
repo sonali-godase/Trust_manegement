@@ -1,4 +1,5 @@
 const LiveStream = require('../models/LiveStream');
+const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require('../utils/cloudinaryHelper');
 
 // @desc    Get the current active live stream
 // @route   GET /api/live/current
@@ -53,17 +54,27 @@ const createLiveStream = async (req, res) => {
     const { title, description, streamUrl, isLive, scheduledAt } = req.body;
     let finalStreamUrl = streamUrl;
     let finalThumbnail = '/event_card.png';
+    let thumbnailPublicId = '';
     let finalVideoFile = '';
+    let videoFilePublicId = '';
 
     if (req.files) {
       if (req.files.thumbnail && req.files.thumbnail[0]) {
-        finalThumbnail = `/uploads/${req.files.thumbnail[0].filename}`;
+        const uploadRes = await uploadToCloudinary(req.files.thumbnail[0].path, "livestreams", { resourceType: "image" });
+        if (uploadRes) {
+          finalThumbnail = uploadRes.url;
+          thumbnailPublicId = uploadRes.publicId;
+        }
       } else if (req.body.thumbnail) {
         finalThumbnail = req.body.thumbnail;
       }
       
       if (req.files.videoFile && req.files.videoFile[0]) {
-        finalVideoFile = `/uploads/${req.files.videoFile[0].filename}`;
+        const uploadRes = await uploadToCloudinary(req.files.videoFile[0].path, "livestreams", { resourceType: "video" });
+        if (uploadRes) {
+          finalVideoFile = uploadRes.url;
+          videoFilePublicId = uploadRes.publicId;
+        }
       }
     } else {
       if (req.body.thumbnail) finalThumbnail = req.body.thumbnail;
@@ -82,7 +93,9 @@ const createLiveStream = async (req, res) => {
       description,
       streamUrl: finalStreamUrl,
       videoFile: finalVideoFile,
+      videoFilePublicId,
       thumbnail: finalThumbnail,
+      thumbnailPublicId,
       isLive: isLiveBool,
       isPastVideo: !isLiveBool, // Automatically mark as past video if not live
       scheduledAt: scheduledAt ? new Date(scheduledAt) : Date.now()
@@ -119,13 +132,27 @@ const updateLiveStream = async (req, res) => {
     
     if (req.files) {
       if (req.files.thumbnail && req.files.thumbnail[0]) {
-        stream.thumbnail = `/uploads/${req.files.thumbnail[0].filename}`;
+        const oldPid = stream.thumbnailPublicId || extractPublicId(stream.thumbnail);
+        if (oldPid) await deleteFromCloudinary(oldPid, "image");
+
+        const uploadRes = await uploadToCloudinary(req.files.thumbnail[0].path, "livestreams", { resourceType: "image" });
+        if (uploadRes) {
+          stream.thumbnail = uploadRes.url;
+          stream.thumbnailPublicId = uploadRes.publicId;
+        }
       } else if (req.body.thumbnail) {
         stream.thumbnail = req.body.thumbnail;
       }
       
       if (req.files.videoFile && req.files.videoFile[0]) {
-        stream.videoFile = `/uploads/${req.files.videoFile[0].filename}`;
+        const oldPid = stream.videoFilePublicId || extractPublicId(stream.videoFile);
+        if (oldPid) await deleteFromCloudinary(oldPid, "video");
+
+        const uploadRes = await uploadToCloudinary(req.files.videoFile[0].path, "livestreams", { resourceType: "video" });
+        if (uploadRes) {
+          stream.videoFile = uploadRes.url;
+          stream.videoFilePublicId = uploadRes.publicId;
+        }
       }
     } else {
       if (req.body.thumbnail) stream.thumbnail = req.body.thumbnail;
@@ -135,7 +162,6 @@ const updateLiveStream = async (req, res) => {
     stream.description = description || stream.description;
     stream.streamUrl = streamUrl !== undefined ? streamUrl : stream.streamUrl;
     stream.isLive = isLiveBool;
-    // Don't modify isPastVideo on update to prevent Live streams turning into Past videos automatically
     stream.scheduledAt = scheduledAt ? new Date(scheduledAt) : stream.scheduledAt;
 
     await stream.save();
@@ -149,6 +175,13 @@ const deleteLiveStream = async (req, res) => {
   try {
     const stream = await LiveStream.findById(req.params.id);
     if (!stream) return res.status(404).json({ success: false, message: 'Stream not found' });
+
+    const thumbPid = stream.thumbnailPublicId || extractPublicId(stream.thumbnail);
+    if (thumbPid) await deleteFromCloudinary(thumbPid, "image");
+
+    const videoPid = stream.videoFilePublicId || extractPublicId(stream.videoFile);
+    if (videoPid) await deleteFromCloudinary(videoPid, "video");
+
     await stream.deleteOne();
     res.status(200).json({ success: true, message: 'Stream deleted' });
   } catch (error) {

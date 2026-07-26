@@ -7,6 +7,13 @@ import { useTranslation } from 'react-i18next';
 import { getCurrentLiveStream } from '../services/liveService';
 import api from '../utils/api';
 
+const getProfilePhoto = (url) => {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  const baseUrl = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api$/, "");
+  return `${baseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
+};
+
 const Navbar = () => {
   const { user, logout } = useAuth();
   const { t, i18n } = useTranslation();
@@ -283,7 +290,7 @@ const Navbar = () => {
                 className="w-10 h-10 rounded-xl flex items-center justify-center font-bold shadow-soft bg-primary/10 text-primary border border-primary/30 transition-all overflow-hidden"
               >
                 {user?.profilePhoto ? (
-                  <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${user.profilePhoto}`} alt="Profile" className="w-full h-full object-cover" />
+                  <img src={getProfilePhoto(user.profilePhoto)} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
                   user?.name ? user.name.charAt(0).toUpperCase() : 'U'
                 )}
@@ -402,7 +409,7 @@ const Navbar = () => {
               <div className="flex items-center gap-3 mb-4 px-2">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold shadow-soft bg-primary/10 text-primary border border-primary/30 overflow-hidden">
                   {user?.profilePhoto ? (
-                    <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${user.profilePhoto}`} alt="Profile" className="w-full h-full object-cover" />
+                    <img src={getProfilePhoto(user.profilePhoto)} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
                     user?.name ? user.name.charAt(0).toUpperCase() : 'U'
                   )}
@@ -482,7 +489,7 @@ const Navbar = () => {
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md border-2 border-white overflow-hidden">
                     {user?.profilePhoto ? (
-                      <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${user.profilePhoto}`} alt="Profile" className="w-full h-full object-cover" />
+                      <img src={getProfilePhoto(user.profilePhoto)} alt="Profile" className="w-full h-full object-cover" />
                     ) : (
                       user?.name ? user.name.charAt(0).toUpperCase() : 'U'
                     )}

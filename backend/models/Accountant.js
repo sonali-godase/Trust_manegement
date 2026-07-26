@@ -9,6 +9,7 @@ const accountantSchema = new mongoose.Schema({
   joiningDate: { type: Date, required: true },
   password: { type: String, required: true },
   profilePhoto: { type: String, default: "" },
+  profilePhotoPublicId: { type: String, default: "" },
   createdByTrusteeId: { type: mongoose.Schema.Types.ObjectId, ref: "Trustee", required: true },
   emailVerified: { type: Boolean, default: false },
   accountStatus: { type: String, enum: ["active", "inactive"], default: "active" },

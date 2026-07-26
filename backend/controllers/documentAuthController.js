@@ -5,6 +5,7 @@ const bcrypt = require("bcryptjs");
 const OTPVerification = require("../models/OTPVerification");
 const generateOTP = require("../utils/otpGenerator");
 const sendEmail = require("../utils/sendEmail");
+const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require("../utils/cloudinaryHelper");
 
 
 const generateToken = (id) => {
@@ -147,8 +148,15 @@ exports.createAdmin = async (req, res) => {
 
 exports.deleteAdmin = async (req, res) => {
   try {
-    const admin = await DocumentAdmin.findByIdAndDelete(req.params.id);
+    const admin = await DocumentAdmin.findById(req.params.id);
     if (!admin) return res.status(404).json({ success: false, message: "Admin not found" });
+    
+    const publicId = admin.profilePhotoPublicId || extractPublicId(admin.profilePhoto);
+    if (publicId) {
+      await deleteFromCloudinary(publicId);
+    }
+
+    await DocumentAdmin.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: "Admin deleted successfully" });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -194,8 +202,19 @@ exports.updateProfile = async (req, res) => {
     if (name !== undefined) admin.name = name;
     if (address !== undefined) admin.address = address;
 
-    if (req.file) {
-      admin.profilePhoto = `/uploads/${req.file.filename}`;
+    const file = req.file || (req.files && (req.files.profilePhoto?.[0] || req.files.profileImage?.[0]));
+    if (file) {
+      const oldPublicId = admin.profilePhotoPublicId || extractPublicId(admin.profilePhoto);
+      if (oldPublicId) {
+        await deleteFromCloudinary(oldPublicId);
+      }
+      const uploadRes = await uploadToCloudinary(file.path, "profiles", { resourceType: "image" });
+      if (uploadRes) {
+        admin.profilePhoto = uploadRes.url;
+        admin.profilePhotoPublicId = uploadRes.publicId;
+      } else {
+        admin.profilePhoto = `/uploads/${file.filename}`;
+      }
     }
 
     await admin.save();

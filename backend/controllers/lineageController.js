@@ -1,4 +1,5 @@
 const LineageMember = require('../models/LineageMember');
+const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require('../utils/cloudinaryHelper');
 
 // Get all members (Admin view)
 exports.getAllMembers = async (req, res) => {
@@ -36,13 +37,37 @@ exports.createMember = async (req, res) => {
 
     if (req.files) {
       if (req.files.profileImage) {
-        newMemberData.profileImage = `/uploads/${req.files.profileImage[0].filename}`;
+        const uploadRes = await uploadToCloudinary(req.files.profileImage[0].path, "lineage", { resourceType: "image" });
+        if (uploadRes) {
+          newMemberData.profileImage = uploadRes.url;
+          newMemberData.profileImagePublicId = uploadRes.publicId;
+        }
       }
       if (req.files.galleryImages) {
-        newMemberData.galleryImages = req.files.galleryImages.map(f => `/uploads/${f.filename}`);
+        const urls = [];
+        const pids = [];
+        for (const f of req.files.galleryImages) {
+          const uploadRes = await uploadToCloudinary(f.path, "lineage", { resourceType: "image" });
+          if (uploadRes) {
+            urls.push(uploadRes.url);
+            pids.push(uploadRes.publicId);
+          }
+        }
+        newMemberData.galleryImages = urls;
+        newMemberData.galleryImagesPublicIds = pids;
       }
       if (req.files.documents) {
-        newMemberData.documents = req.files.documents.map(f => `/uploads/${f.filename}`);
+        const urls = [];
+        const pids = [];
+        for (const f of req.files.documents) {
+          const uploadRes = await uploadToCloudinary(f.path, "lineage/documents", { resourceType: "auto" });
+          if (uploadRes) {
+            urls.push(uploadRes.url);
+            pids.push(uploadRes.publicId);
+          }
+        }
+        newMemberData.documents = urls;
+        newMemberData.documentsPublicIds = pids;
       }
     }
 
@@ -59,27 +84,64 @@ exports.createMember = async (req, res) => {
 exports.updateMember = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, era, shortDescription, biography, status, parentId } = req.body;
+    const existingMember = await LineageMember.findById(id);
+    if (!existingMember) {
+      return res.status(404).json({ success: false, message: 'Member not found' });
+    }
 
+    const { name, era, shortDescription, biography, status, parentId } = req.body;
     const updateData = { name, era, shortDescription, biography, status, parentId: parentId || null };
+
     if (req.files) {
       if (req.files.profileImage) {
-        updateData.profileImage = `/uploads/${req.files.profileImage[0].filename}`;
+        const oldPid = existingMember.profileImagePublicId || extractPublicId(existingMember.profileImage);
+        if (oldPid) await deleteFromCloudinary(oldPid, "image");
+
+        const uploadRes = await uploadToCloudinary(req.files.profileImage[0].path, "lineage", { resourceType: "image" });
+        if (uploadRes) {
+          updateData.profileImage = uploadRes.url;
+          updateData.profileImagePublicId = uploadRes.publicId;
+        }
       }
       if (req.files.galleryImages) {
-        updateData.galleryImages = req.files.galleryImages.map(f => `/uploads/${f.filename}`);
+        if (existingMember.galleryImagesPublicIds && existingMember.galleryImagesPublicIds.length > 0) {
+          for (const pid of existingMember.galleryImagesPublicIds) {
+            await deleteFromCloudinary(pid, "image");
+          }
+        }
+        const urls = [];
+        const pids = [];
+        for (const f of req.files.galleryImages) {
+          const uploadRes = await uploadToCloudinary(f.path, "lineage", { resourceType: "image" });
+          if (uploadRes) {
+            urls.push(uploadRes.url);
+            pids.push(uploadRes.publicId);
+          }
+        }
+        updateData.galleryImages = urls;
+        updateData.galleryImagesPublicIds = pids;
       }
       if (req.files.documents) {
-        updateData.documents = req.files.documents.map(f => `/uploads/${f.filename}`);
+        if (existingMember.documentsPublicIds && existingMember.documentsPublicIds.length > 0) {
+          for (const pid of existingMember.documentsPublicIds) {
+            await deleteFromCloudinary(pid, "raw");
+          }
+        }
+        const urls = [];
+        const pids = [];
+        for (const f of req.files.documents) {
+          const uploadRes = await uploadToCloudinary(f.path, "lineage/documents", { resourceType: "auto" });
+          if (uploadRes) {
+            urls.push(uploadRes.url);
+            pids.push(uploadRes.publicId);
+          }
+        }
+        updateData.documents = urls;
+        updateData.documentsPublicIds = pids;
       }
     }
 
     const updatedMember = await LineageMember.findByIdAndUpdate(id, updateData, { returnDocument: 'after' });
-    
-    if (!updatedMember) {
-      return res.status(404).json({ success: false, message: 'Member not found' });
-    }
-
     res.status(200).json({ success: true, data: updatedMember });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error updating member', error: error.message });
@@ -90,11 +152,27 @@ exports.updateMember = async (req, res) => {
 exports.deleteMember = async (req, res) => {
   try {
     const { id } = req.params;
-    const deletedMember = await LineageMember.findByIdAndDelete(id);
-    
-    if (!deletedMember) {
+    const member = await LineageMember.findById(id);
+    if (!member) {
       return res.status(404).json({ success: false, message: 'Member not found' });
     }
+
+    const profilePid = member.profileImagePublicId || extractPublicId(member.profileImage);
+    if (profilePid) await deleteFromCloudinary(profilePid, "image");
+
+    if (member.galleryImagesPublicIds && member.galleryImagesPublicIds.length > 0) {
+      for (const pid of member.galleryImagesPublicIds) {
+        await deleteFromCloudinary(pid, "image");
+      }
+    }
+
+    if (member.documentsPublicIds && member.documentsPublicIds.length > 0) {
+      for (const pid of member.documentsPublicIds) {
+        await deleteFromCloudinary(pid, "raw");
+      }
+    }
+
+    await LineageMember.findByIdAndDelete(id);
 
     res.status(200).json({ success: true, message: 'Member deleted successfully' });
   } catch (error) {

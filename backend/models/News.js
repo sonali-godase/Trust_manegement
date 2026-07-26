@@ -20,9 +20,23 @@ const newsSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Cover image is required']
   },
+  coverImagePublicId: {
+    type: String,
+    default: ''
+  },
   galleryImages: [{
     type: String
   }],
+  galleryImagesPublicIds: [{
+    type: String
+  }],
+  videoFile: {
+    type: String
+  },
+  videoFilePublicId: {
+    type: String,
+    default: ''
+  },
   category: {
     type: String,
     required: [true, 'Category is required'],

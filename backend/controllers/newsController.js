@@ -1,4 +1,5 @@
 const News = require("../models/News");
+const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require("../utils/cloudinaryHelper");
 
 // Helper to filter active, published and unexpired news
 const getActiveNewsQuery = (additional = {}) => {
@@ -184,15 +185,25 @@ exports.createNews = async (req, res) => {
     // Handle uploaded files
     if (req.files) {
       if (req.files['coverImage']) {
-        newsData.coverImage = `/uploads/${req.files['coverImage'][0].filename}`;
+        const uploadRes = await uploadToCloudinary(req.files['coverImage'][0].path, "news/images", { resourceType: "image" });
+        if (uploadRes) {
+          newsData.coverImage = uploadRes.url;
+          newsData.coverImagePublicId = uploadRes.publicId;
+        }
       }
       
       if (req.files['galleryImages']) {
         const galleryUrls = [];
+        const galleryPublicIds = [];
         for (const file of req.files['galleryImages']) {
-          galleryUrls.push(`/uploads/${file.filename}`);
+          const uploadRes = await uploadToCloudinary(file.path, "news/images", { resourceType: "image" });
+          if (uploadRes) {
+            galleryUrls.push(uploadRes.url);
+            galleryPublicIds.push(uploadRes.publicId);
+          }
         }
         newsData.galleryImages = galleryUrls;
+        newsData.galleryImagesPublicIds = galleryPublicIds;
       }
     }
 
@@ -252,38 +263,33 @@ exports.updateNews = async (req, res) => {
     // Handle files upload
     if (req.files) {
       if (req.files['coverImage']) {
-        newsData.coverImage = `/uploads/${req.files['coverImage'][0].filename}`;
+        const oldPid = news.coverImagePublicId || extractPublicId(news.coverImage);
+        if (oldPid) await deleteFromCloudinary(oldPid, "image");
+
+        const uploadRes = await uploadToCloudinary(req.files['coverImage'][0].path, "news/images", { resourceType: "image" });
+        if (uploadRes) {
+          newsData.coverImage = uploadRes.url;
+          newsData.coverImagePublicId = uploadRes.publicId;
+        }
       }
       
-      // Retain or replace gallery images
-      let galleryUrls = [];
-      if (req.body.retainedGalleryImages) {
-        try {
-          galleryUrls = JSON.parse(req.body.retainedGalleryImages);
-        } catch (e) {
-          if (typeof req.body.retainedGalleryImages === 'string') {
-            galleryUrls = [req.body.retainedGalleryImages];
+      if (req.files['galleryImages']) {
+        if (news.galleryImagesPublicIds && news.galleryImagesPublicIds.length > 0) {
+          for (const pid of news.galleryImagesPublicIds) {
+            await deleteFromCloudinary(pid, "image");
           }
         }
-      } else {
-        // If not specified, default to existing ones unless we are explicitly replacing
-        galleryUrls = news.galleryImages || [];
-      }
-
-      if (req.files['galleryImages']) {
+        const galleryUrls = [];
+        const galleryPublicIds = [];
         for (const file of req.files['galleryImages']) {
-          galleryUrls.push(`/uploads/${file.filename}`);
+          const uploadRes = await uploadToCloudinary(file.path, "news/images", { resourceType: "image" });
+          if (uploadRes) {
+            galleryUrls.push(uploadRes.url);
+            galleryPublicIds.push(uploadRes.publicId);
+          }
         }
-      }
-      newsData.galleryImages = galleryUrls;
-    } else if (req.body.retainedGalleryImages) {
-      // No new uploads, but retained images might have changed (e.g. deleted some)
-      try {
-        newsData.galleryImages = JSON.parse(req.body.retainedGalleryImages);
-      } catch (e) {
-        if (typeof req.body.retainedGalleryImages === 'string') {
-          newsData.galleryImages = [req.body.retainedGalleryImages];
-        }
+        newsData.galleryImages = galleryUrls;
+        newsData.galleryImagesPublicIds = galleryPublicIds;
       }
     }
 
@@ -320,6 +326,16 @@ exports.deleteNews = async (req, res) => {
       );
       if (!hasPermission) {
         return res.status(403).json({ success: false, message: "Unauthorized. Manage permission required for News or Gallery" });
+      }
+    }
+
+    // Delete Cloudinary assets
+    const coverPid = news.coverImagePublicId || extractPublicId(news.coverImage);
+    if (coverPid) await deleteFromCloudinary(coverPid, "image");
+
+    if (news.galleryImagesPublicIds && news.galleryImagesPublicIds.length > 0) {
+      for (const pid of news.galleryImagesPublicIds) {
+        await deleteFromCloudinary(pid, "image");
       }
     }
 

@@ -63,6 +63,11 @@ const donationSchema = new mongoose.Schema({
     type: String,
     required: false
   },
+  cloudinaryPublicId: {
+    type: String,
+    required: false,
+    default: ""
+  },
   rejectionReason: {
     type: String,
     required: false

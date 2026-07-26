@@ -35,6 +35,10 @@ const documentAdminSchema = new mongoose.Schema({
   profilePhoto: {
     type: String,
     default: ""
+  },
+  profilePhotoPublicId: {
+    type: String,
+    default: ""
   }
 }, { timestamps: true });
 

@@ -33,10 +33,20 @@ const LineageMemberSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  profileImagePublicId: {
+    type: String,
+    default: null
+  },
   galleryImages: [{
     type: String
   }],
+  galleryImagesPublicIds: [{
+    type: String
+  }],
   documents: [{
+    type: String
+  }],
+  documentsPublicIds: [{
     type: String
   }]
 }, { timestamps: true });

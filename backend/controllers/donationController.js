@@ -1,6 +1,7 @@
 const Donation = require("../models/Donation");
 const Branch = require("../models/Branch");
 const cloudinary = require("../config/cloudinary");
+const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require("../utils/cloudinaryHelper");
 const fs = require("fs");
 const crypto = require("crypto");
 const sendEmail = require("../utils/sendEmail");
@@ -88,22 +89,12 @@ exports.createDonation = async (req, res) => {
     }
 
     let screenshotUrl = null;
+    let cloudinaryPublicId = null;
     if (req.file) {
-      const cloudinaryInstance = await cloudinary.getCloudinary();
-      if (cloudinaryInstance) {
-        try {
-          const result = await cloudinaryInstance.uploader.upload(req.file.path, {
-            folder: "trust_donations",
-          });
-          screenshotUrl = result.secure_url;
-          fs.unlinkSync(req.file.path);
-        } catch (uploadError) {
-          console.error("Cloudinary upload failed, falling back to local static URL:", uploadError.message);
-          screenshotUrl = `/uploads/${req.file.filename}`;
-        }
-      } else {
-        console.log("Cloudinary not configured, falling back to local static URL.");
-        screenshotUrl = `/uploads/${req.file.filename}`;
+      const uploadRes = await uploadToCloudinary(req.file.path, "donations", { resourceType: "image" });
+      if (uploadRes) {
+        screenshotUrl = uploadRes.url;
+        cloudinaryPublicId = uploadRes.publicId;
       }
     }
 
@@ -128,6 +119,7 @@ exports.createDonation = async (req, res) => {
           upiId,
           paymentApp,
           screenshotUrl,
+          cloudinaryPublicId,
           donationType: finalDonationType,
           status: "PENDING_VERIFICATION",
           userId: req.user ? req.user._id : undefined
@@ -236,23 +228,17 @@ exports.submitPayment = async (req, res) => {
     }
 
     let screenshotUrl = donation.screenshotUrl;
+    let cloudinaryPublicId = donation.cloudinaryPublicId;
 
     if (req.file) {
-      const cloudinaryInstance = await cloudinary.getCloudinary();
-      if (cloudinaryInstance) {
-        try {
-          const result = await cloudinaryInstance.uploader.upload(req.file.path, {
-            folder: "trust_donations",
-          });
-          screenshotUrl = result.secure_url;
-          fs.unlinkSync(req.file.path);
-        } catch (uploadError) {
-          console.error("Cloudinary upload failed, falling back to local static URL:", uploadError.message);
-          screenshotUrl = `/uploads/${req.file.filename}`;
-        }
-      } else {
-        console.log("Cloudinary not configured, falling back to local static URL.");
-        screenshotUrl = `/uploads/${req.file.filename}`;
+      const oldPublicId = donation.cloudinaryPublicId || extractPublicId(donation.screenshotUrl);
+      if (oldPublicId) {
+        await deleteFromCloudinary(oldPublicId);
+      }
+      const uploadRes = await uploadToCloudinary(req.file.path, "donations", { resourceType: "image" });
+      if (uploadRes) {
+        screenshotUrl = uploadRes.url;
+        cloudinaryPublicId = uploadRes.publicId;
       }
     }
 
@@ -260,6 +246,7 @@ exports.submitPayment = async (req, res) => {
     donation.upiId = upiId;
     donation.paymentApp = paymentApp;
     donation.screenshotUrl = screenshotUrl;
+    donation.cloudinaryPublicId = cloudinaryPublicId;
     donation.status = "PENDING_VERIFICATION";
     
     await donation.save();

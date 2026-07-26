@@ -16,6 +16,7 @@ const documentRequestSchema = new mongoose.Schema({
     category: { type: String },
     pdfName: { type: String },
     pdfUrl: { type: String },
+    cloudinaryPublicId: { type: String, default: "" },
     fileSize: { type: Number },
     branch: { type: mongoose.Schema.Types.ObjectId, ref: "Branch" }
   },

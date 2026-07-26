@@ -20,6 +20,7 @@ const Annadaan     = require("../models/Annadaan");
 const path         = require("path");
 const fs           = require("fs");
 const { generateReceiptPdf } = require("../utils/generateReceipt");
+const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require("../utils/cloudinaryHelper");
 
 
 // ─── Helper: build query that matches by userId OR email ─────────────────────
@@ -76,27 +77,33 @@ exports.updateProfile = async (req, res) => {
     }
 
     // Handle profile photo upload (multer file)
-    if (req.file) {
-      // Delete old profile photo if it exists
+    const file = req.file || (req.files && (req.files.profilePhoto?.[0] || req.files.profileImage?.[0]));
+    if (file) {
       const currentUser = await Model.findById(req.user._id);
-      if (currentUser.profilePhoto) {
-        const oldPath = path.join(__dirname, "..", currentUser.profilePhoto);
-        if (fs.existsSync(oldPath)) {
-          fs.unlinkSync(oldPath);
-        }
+      const oldPublicId = currentUser?.profilePhotoPublicId || extractPublicId(currentUser?.profilePhoto);
+      if (oldPublicId) {
+        await deleteFromCloudinary(oldPublicId);
       }
-      updateData.profilePhoto = `/uploads/profiles/${req.file.filename}`;
+
+      const uploadRes = await uploadToCloudinary(file.path, "profiles", { resourceType: "image" });
+      if (uploadRes) {
+        updateData.profilePhoto = uploadRes.url;
+        updateData.profilePhotoPublicId = uploadRes.publicId;
+      } else {
+        updateData.profilePhoto = `/uploads/profiles/${file.filename}`;
+      }
     }
 
-    const updatedUser = await Model.findByIdAndUpdate(
-      req.user._id,
-      { $set: updateData },
-      { new: true, runValidators: true }
-    ).select("-password");
-
-    if (!updatedUser) {
+    const currentUser = await Model.findById(req.user._id);
+    if (!currentUser) {
       return res.status(404).json({ success: false, message: "User not found." });
     }
+
+    Object.assign(currentUser, updateData);
+    await currentUser.save();
+
+    const updatedUser = currentUser.toObject();
+    delete updatedUser.password;
 
     return res.status(200).json({
       success: true,
@@ -105,7 +112,7 @@ exports.updateProfile = async (req, res) => {
     });
   } catch (err) {
     console.error("[userDashboard][ERROR] updateProfile:", err.message);
-    return res.status(500).json({ success: false, message: "Failed to update profile." });
+    return res.status(500).json({ success: false, message: err.message || "Failed to update profile." });
   }
 };
 

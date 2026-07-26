@@ -3,6 +3,7 @@ const Document = require("../models/Document");
 const AuditLog = require("../models/AuditLog");
 const fs = require("fs");
 const path = require("path");
+const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require("../utils/cloudinaryHelper");
 
 // @desc    Submit a document CRUD request for Trustee approval
 // @route   POST /api/documents/requests
@@ -30,9 +31,16 @@ exports.createDocumentRequest = async (req, res) => {
     }
 
     let documentData = {};
+    let uploadRes = null;
+    if (req.file) {
+      uploadRes = await uploadToCloudinary(req.file.path, "documents", { resourceType: "auto" });
+      if (!uploadRes) {
+        return res.status(500).json({ success: false, message: "Failed to upload file to Cloudinary" });
+      }
+    }
 
     if (requestType === "Create") {
-      if (!req.file) {
+      if (!uploadRes) {
         return res.status(400).json({ success: false, message: "Please upload a document file for creation" });
       }
       documentData = {
@@ -40,7 +48,8 @@ exports.createDocumentRequest = async (req, res) => {
         description: description || "Document upload request",
         category: category || "Other",
         pdfName: req.file.originalname,
-        pdfUrl: `/uploads/documents/${req.file.filename}`,
+        pdfUrl: uploadRes.url,
+        cloudinaryPublicId: uploadRes.publicId,
         fileSize: req.file.size,
         branch: branchId || req.user.branch || undefined
       };
@@ -49,9 +58,10 @@ exports.createDocumentRequest = async (req, res) => {
         title: title || targetDoc.title,
         description: description || targetDoc.description,
         category: category || targetDoc.category,
-        pdfName: req.file ? req.file.originalname : targetDoc.pdfName,
-        pdfUrl: req.file ? `/uploads/documents/${req.file.filename}` : targetDoc.pdfUrl,
-        fileSize: req.file ? req.file.size : targetDoc.fileSize,
+        pdfName: uploadRes ? req.file.originalname : targetDoc.pdfName,
+        pdfUrl: uploadRes ? uploadRes.url : targetDoc.pdfUrl,
+        cloudinaryPublicId: uploadRes ? uploadRes.publicId : targetDoc.cloudinaryPublicId,
+        fileSize: uploadRes ? req.file.size : targetDoc.fileSize,
         branch: branchId || targetDoc.branch
       };
     } else if (requestType === "Delete") {
@@ -61,6 +71,7 @@ exports.createDocumentRequest = async (req, res) => {
         category: targetDoc.category,
         pdfName: targetDoc.pdfName,
         pdfUrl: targetDoc.pdfUrl,
+        cloudinaryPublicId: targetDoc.cloudinaryPublicId,
         fileSize: targetDoc.fileSize,
         branch: targetDoc.branch
       };
@@ -171,6 +182,7 @@ exports.processDocumentRequest = async (req, res) => {
           category: docRequest.documentData.category,
           pdfName: docRequest.documentData.pdfName,
           pdfUrl: docRequest.documentData.pdfUrl,
+          cloudinaryPublicId: docRequest.documentData.cloudinaryPublicId,
           fileSize: docRequest.documentData.fileSize,
           uploadedBy: docRequest.requestedBy,
           branch: docRequest.documentData.branch || undefined,
@@ -187,11 +199,15 @@ exports.processDocumentRequest = async (req, res) => {
           targetDoc.description = docRequest.documentData.description || targetDoc.description;
           targetDoc.category = docRequest.documentData.category || targetDoc.category;
           if (docRequest.documentData.pdfUrl && docRequest.documentData.pdfUrl !== targetDoc.pdfUrl) {
-            // Delete old file if replaced
-            const oldPath = path.join(__dirname, "..", targetDoc.pdfUrl);
-            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+            // Delete old Cloudinary file if replaced
+            const oldPublicId = targetDoc.cloudinaryPublicId || extractPublicId(targetDoc.pdfUrl);
+            if (oldPublicId) {
+              await deleteFromCloudinary(oldPublicId, "raw");
+              await deleteFromCloudinary(oldPublicId, "image");
+            }
             targetDoc.pdfName = docRequest.documentData.pdfName;
             targetDoc.pdfUrl = docRequest.documentData.pdfUrl;
+            targetDoc.cloudinaryPublicId = docRequest.documentData.cloudinaryPublicId;
             targetDoc.fileSize = docRequest.documentData.fileSize;
           }
           targetDoc.status = "Approved";
@@ -202,9 +218,10 @@ exports.processDocumentRequest = async (req, res) => {
       } else if (docRequest.requestType === "Delete") {
         const targetDoc = await Document.findById(docRequest.targetDocument);
         if (targetDoc) {
-          const filePath = path.join(__dirname, "..", targetDoc.pdfUrl);
-          if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
+          const publicId = targetDoc.cloudinaryPublicId || extractPublicId(targetDoc.pdfUrl);
+          if (publicId) {
+            await deleteFromCloudinary(publicId, "raw");
+            await deleteFromCloudinary(publicId, "image");
           }
           await targetDoc.deleteOne();
         }

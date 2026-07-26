@@ -271,10 +271,17 @@ exports.updateTrack = async (req, res) => {
 
 exports.deleteTrack = async (req, res) => {
   try {
-    const track = await AudioTrack.findByIdAndDelete(req.params.id);
+    const track = await AudioTrack.findById(req.params.id);
     if (!track) return res.status(404).json({ message: 'Track not found' });
     
-    // Note: Should also delete from cloudinary, but skipping for brevity unless requested
+    const { deleteFromCloudinary, extractPublicId } = require('../utils/cloudinaryHelper');
+    const audioPid = track.audioPublicId || extractPublicId(track.audioUrl);
+    if (audioPid) await deleteFromCloudinary(audioPid, 'video');
+
+    const thumbPid = track.thumbnailPublicId || extractPublicId(track.thumbnailUrl);
+    if (thumbPid) await deleteFromCloudinary(thumbPid, 'image');
+
+    await AudioTrack.findByIdAndDelete(req.params.id);
     
     res.status(200).json({ success: true, message: 'Track deleted' });
   } catch (error) {

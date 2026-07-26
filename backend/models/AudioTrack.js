@@ -10,9 +10,17 @@ const audioTrackSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Audio URL is required']
   },
+  audioPublicId: {
+    type: String,
+    default: ''
+  },
   thumbnailUrl: {
     type: String,
     default: '',
+  },
+  thumbnailPublicId: {
+    type: String,
+    default: ''
   },
   lyricsDataUrl: {
     type: String, // Cloudinary URL to the .vtt or .srt file

@@ -79,7 +79,10 @@ const DocumentAdminProfile = () => {
         address: user.address || ''
       });
       if (user.profilePhoto) {
-        setImagePreview(`${API_URL}${user.profilePhoto}`);
+        const photoUrl = user.profilePhoto.startsWith('http') 
+          ? user.profilePhoto 
+          : `${API_URL.replace(/\/api$/, '')}${user.profilePhoto.startsWith('/') ? '' : '/'}${user.profilePhoto}`;
+        setImagePreview(photoUrl);
       }
     }
   }, [user]);
@@ -318,7 +321,7 @@ const DocumentAdminProfile = () => {
 
                   {isEditing && (
                     <div className="pt-6 border-t border-gray-100 flex justify-end gap-3">
-                      <button type="button" onClick={() => { setIsEditing(false); setSuccessMsg(''); setErrorMsg(''); setImagePreview(user?.profilePhoto ? `${API_URL}${user.profilePhoto}` : null); setProfileImage(null); setFormData({ name: user.name || '', email: user.email || '', contactNo: user.contactNo || '', address: user.address || '' }); }} className="px-5 py-2.5 rounded-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors">
+                      <button type="button" onClick={() => { setIsEditing(false); setSuccessMsg(''); setErrorMsg(''); setImagePreview(user?.profilePhoto ? (user.profilePhoto.startsWith('http') ? user.profilePhoto : `${API_URL.replace(/\/api$/, '')}${user.profilePhoto}`) : null); setProfileImage(null); setFormData({ name: user.name || '', email: user.email || '', contactNo: user.contactNo || '', address: user.address || '' }); }} className="px-5 py-2.5 rounded-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors">
                         Cancel
                       </button>
                       <button type="submit" disabled={loading} className="px-6 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-bold shadow-lg transition-colors flex items-center gap-2 disabled:opacity-50">

@@ -4,6 +4,7 @@ const generateOTP = require("../utils/otpGenerator");
 const sendEmail = require("../utils/sendEmail");
 const { logAction } = require("./auditController");
 const jwt = require("jsonwebtoken");
+const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require("../utils/cloudinaryHelper");
 
 // Send OTP for Accountant Email Verification
 exports.sendVerificationOtp = async (req, res) => {
@@ -150,7 +151,10 @@ exports.deleteAccountant = async (req, res) => {
     const { id } = req.params;
     const accountant = await Accountant.findById(id);
     
-    if (!accountant) return res.status(404).json({ success: false, message: "Accountant not found" });
+    const publicId = accountant.profilePhotoPublicId || extractPublicId(accountant.profilePhoto);
+    if (publicId) {
+      await deleteFromCloudinary(publicId);
+    }
 
     await Accountant.findByIdAndDelete(id);
 
@@ -182,8 +186,19 @@ exports.updateProfile = async (req, res) => {
     if (address !== undefined) accountant.address = address;
     if (profilePhoto !== undefined) accountant.profilePhoto = profilePhoto;
 
-    if (req.file) {
-      accountant.profilePhoto = `/uploads/${req.file.filename}`;
+    const file = req.file || (req.files && (req.files.profilePhoto?.[0] || req.files.profileImage?.[0]));
+    if (file) {
+      const oldPublicId = accountant.profilePhotoPublicId || extractPublicId(accountant.profilePhoto);
+      if (oldPublicId) {
+        await deleteFromCloudinary(oldPublicId);
+      }
+      const uploadRes = await uploadToCloudinary(file.path, "profiles", { resourceType: "image" });
+      if (uploadRes) {
+        accountant.profilePhoto = uploadRes.url;
+        accountant.profilePhotoPublicId = uploadRes.publicId;
+      } else {
+        accountant.profilePhoto = `/uploads/${file.filename}`;
+      }
     }
 
     await accountant.save();

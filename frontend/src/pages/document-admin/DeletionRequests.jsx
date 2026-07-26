@@ -5,6 +5,12 @@ import api from "../../utils/api";
 
 const ASSETS_URL = import.meta.env.VITE_ASSETS_URL || "http://localhost:5000";
 
+const getDocUrl = (url) => {
+  if (!url) return "#";
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  return `${ASSETS_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+};
+
 const DocumentAdminDeletionRequests = () => {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -175,7 +181,7 @@ const DocumentAdminDeletionRequests = () => {
                             <button onClick={() => openViewModal(doc)} className="p-2 w-10 h-10 md:w-auto md:h-auto flex items-center justify-center bg-white md:bg-transparent border border-slate-200 md:border-none text-indigo-600 hover:bg-indigo-50 rounded-lg tooltip transition-colors shadow-sm md:shadow-none" title="View">
                               <FiEye />
                             </button>
-                            <a href={`${ASSETS_URL}${doc.pdfUrl}`} target="_blank" rel="noopener noreferrer" className="p-2 w-10 h-10 md:w-auto md:h-auto flex items-center justify-center bg-white md:bg-transparent border border-slate-200 md:border-none text-emerald-600 hover:bg-emerald-50 rounded-lg tooltip transition-colors shadow-sm md:shadow-none" title="Download">
+                            <a href={getDocUrl(doc.pdfUrl)} target="_blank" rel="noopener noreferrer" className="p-2 w-10 h-10 md:w-auto md:h-auto flex items-center justify-center bg-white md:bg-transparent border border-slate-200 md:border-none text-emerald-600 hover:bg-emerald-50 rounded-lg tooltip transition-colors shadow-sm md:shadow-none" title="Download">
                               <FiDownload />
                             </a>
                             <button onClick={() => handleApproveDeletion(doc)} className="p-2 flex-1 md:flex-none flex justify-center items-center gap-2 bg-white md:bg-transparent border border-red-200 md:border-none text-red-600 hover:bg-red-50 rounded-lg tooltip transition-colors shadow-sm md:shadow-none" title="Approve Deletion Request">
@@ -200,7 +206,7 @@ const DocumentAdminDeletionRequests = () => {
             <div className="flex justify-between items-center mb-4 text-white">
               <h3 className="font-bold text-xl">{currentDocument.title}</h3>
               <div className="flex gap-4">
-                <a href={`${ASSETS_URL}${currentDocument.pdfUrl}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors">
+                <a href={getDocUrl(currentDocument.pdfUrl)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors">
                   <FiDownload /> Download
                 </a>
                 <button onClick={() => setIsViewModalOpen(false)} className="text-white hover:text-slate-300 bg-white/10 p-2 rounded-lg">
@@ -210,10 +216,10 @@ const DocumentAdminDeletionRequests = () => {
             </div>
             <div className="flex-1 bg-white rounded-2xl overflow-hidden">
               {currentDocument.pdfUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
-                <img src={`${ASSETS_URL}${currentDocument.pdfUrl}`} alt={currentDocument.title} className="w-full h-full object-contain" />
+                <img src={getDocUrl(currentDocument.pdfUrl)} alt={currentDocument.title} className="w-full h-full object-contain" />
               ) : (
                 <iframe 
-                  src={`${ASSETS_URL}${currentDocument.pdfUrl}`} 
+                  src={getDocUrl(currentDocument.pdfUrl)} 
                   className="w-full h-full border-0"
                   title={currentDocument.title}
                 />

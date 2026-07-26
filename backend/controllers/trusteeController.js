@@ -7,6 +7,7 @@ const Announcement = require("../models/Announcement");
 const Trustee = require("../models/Trustee");
 const Annadaan = require("../models/Annadaan");
 const AuditLog = require("../models/AuditLog");
+const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require("../utils/cloudinaryHelper");
  // Need User model for trustees
 
 exports.getPublicTrustees = async (req, res) => {
@@ -165,11 +166,10 @@ exports.reviewDeletionRequest = async (req, res) => {
       const hasTrusteeApproval = doc.deletionApprovals.some(a => a.role === 'Trustee');
 
       if (hasAdminApproval && hasTrusteeApproval) {
-        const fs = require('fs');
-        const path = require('path');
-        const filePath = path.join(__dirname, "..", doc.pdfUrl);
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
+        const publicId = doc.cloudinaryPublicId || extractPublicId(doc.pdfUrl);
+        if (publicId) {
+          await deleteFromCloudinary(publicId, "raw");
+          await deleteFromCloudinary(publicId, "image");
         }
         await doc.deleteOne();
         return res.status(200).json({ success: true, message: "Deletion request fully approved and document deleted" });
@@ -199,7 +199,20 @@ exports.updateProfile = async (req, res) => {
 
     if (name) trustee.name = name;
     if (mobile) trustee.mobile = mobile;
-    if (req.file) trustee.profilePhoto = '/uploads/' + req.file.filename;
+    const file = req.file || (req.files && (req.files.profilePhoto?.[0] || req.files.profileImage?.[0]));
+    if (file) {
+      const oldPublicId = trustee.profilePhotoPublicId || extractPublicId(trustee.profilePhoto);
+      if (oldPublicId) {
+        await deleteFromCloudinary(oldPublicId);
+      }
+      const uploadRes = await uploadToCloudinary(file.path, "profiles", { resourceType: "image" });
+      if (uploadRes) {
+        trustee.profilePhoto = uploadRes.url;
+        trustee.profilePhotoPublicId = uploadRes.publicId;
+      } else {
+        trustee.profilePhoto = `/uploads/${file.filename}`;
+      }
+    }
     if (password) trustee.password = password;
 
     await trustee.save();

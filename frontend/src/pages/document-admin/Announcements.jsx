@@ -438,7 +438,7 @@ const Announcements = () => {
                         <div className="flex gap-3 items-center">
                           <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 font-bold overflow-hidden border border-slate-200 shrink-0">
                             {ann.createdBy?.profilePhoto ? (
-                               <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${ann.createdBy.profilePhoto}`} className="w-full h-full object-cover" />
+                               <img src={ann.createdBy.profilePhoto.startsWith('http') ? ann.createdBy.profilePhoto : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${ann.createdBy.profilePhoto}`} className="w-full h-full object-cover" />
                             ) : (
                                <img src="/logo.png" className="w-full h-full object-contain p-1.5" />
                             )}

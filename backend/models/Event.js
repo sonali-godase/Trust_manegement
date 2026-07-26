@@ -24,11 +24,22 @@ const eventSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Featured image is required']
   },
+  featuredImagePublicId: {
+    type: String,
+    default: ''
+  },
   galleryImages: [{
+    type: String
+  }],
+  galleryImagesPublicIds: [{
     type: String
   }],
   videoFile: {
     type: String
+  },
+  videoFilePublicId: {
+    type: String,
+    default: ''
   },
   eventDate: {
     type: Date,

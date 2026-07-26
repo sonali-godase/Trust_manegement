@@ -62,7 +62,7 @@ router.use(authMiddleware);
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 router.get("/profile", controller.getProfile);
-router.put("/profile", upload.single("profilePhoto"), controller.updateProfile);
+router.put("/profile", upload.fields([{ name: "profilePhoto", maxCount: 1 }, { name: "profileImage", maxCount: 1 }]), controller.updateProfile);
 router.get("/my-donations", controller.getMyDonations);
 router.get("/my-donations/:id/receipt", controller.downloadReceipt);
 router.get("/my-annadaan", controller.getMyAnnadaan);

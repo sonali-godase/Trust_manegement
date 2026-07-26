@@ -9,6 +9,7 @@ const upload = require("../middleware/uploadMiddleware");
 router.use(authMiddleware, checkRole("Admin"));
 
 router.get("/stats", adminController.getStats);
+router.put("/profile", upload.single("profileImage"), adminController.updateProfile);
 
 // Trustees
 router.get("/trustees", adminController.getTrustees);

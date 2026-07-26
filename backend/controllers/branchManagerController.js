@@ -3,6 +3,7 @@ const Event = require("../models/Event");
 const Document = require("../models/Document");
 const BranchManager = require("../models/BranchManager");
 const News = require("../models/News");
+const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require("../utils/cloudinaryHelper");
 
 exports.updateProfile = async (req, res) => {
   try {
@@ -19,8 +20,19 @@ exports.updateProfile = async (req, res) => {
     if (address !== undefined) manager.address = address;
     if (password !== undefined) manager.password = password; // Will be hashed by pre-save hook
 
-    if (req.file) {
-      manager.profilePhoto = `/uploads/${req.file.filename}`;
+    const file = req.file || (req.files && (req.files.profilePhoto?.[0] || req.files.profileImage?.[0]));
+    if (file) {
+      const oldPublicId = manager.profilePhotoPublicId || extractPublicId(manager.profilePhoto);
+      if (oldPublicId) {
+        await deleteFromCloudinary(oldPublicId);
+      }
+      const uploadRes = await uploadToCloudinary(file.path, "profiles", { resourceType: "image" });
+      if (uploadRes) {
+        manager.profilePhoto = uploadRes.url;
+        manager.profilePhotoPublicId = uploadRes.publicId;
+      } else {
+        manager.profilePhoto = `/uploads/${file.filename}`;
+      }
     }
 
     await manager.save();

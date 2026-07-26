@@ -36,6 +36,7 @@ const devoteeSchema = new mongoose.Schema({
   city: { type: String },
   branch: { type: mongoose.Schema.Types.ObjectId, ref: "Branch", index: true },
   profilePhoto: { type: String },
+  profilePhotoPublicId: { type: String, default: "" },
   registrationDate: { type: Date, default: Date.now },
 
   // Search optimization fields

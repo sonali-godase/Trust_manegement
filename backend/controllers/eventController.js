@@ -1,4 +1,5 @@
 const Event = require("../models/Event");
+const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require("../utils/cloudinaryHelper");
 // Removed Cloudinary as per strict requirement for physical uploads
 
 // Status is now manually managed by Admin, no dynamic override needed.
@@ -54,19 +55,33 @@ exports.createEvent = async (req, res) => {
     // Process files if available
     if (req.files) {
       if (req.files['featuredImage']) {
-        eventData.featuredImage = `/uploads/${req.files['featuredImage'][0].filename}`;
+        const uploadRes = await uploadToCloudinary(req.files['featuredImage'][0].path, "events/images", { resourceType: "image" });
+        if (uploadRes) {
+          eventData.featuredImage = uploadRes.url;
+          eventData.featuredImagePublicId = uploadRes.publicId;
+        }
       }
       
       if (req.files['galleryImages']) {
         const galleryUrls = [];
+        const galleryPublicIds = [];
         for (const file of req.files['galleryImages']) {
-          galleryUrls.push(`/uploads/${file.filename}`);
+          const uploadRes = await uploadToCloudinary(file.path, "events/images", { resourceType: "image" });
+          if (uploadRes) {
+            galleryUrls.push(uploadRes.url);
+            galleryPublicIds.push(uploadRes.publicId);
+          }
         }
         eventData.galleryImages = galleryUrls;
+        eventData.galleryImagesPublicIds = galleryPublicIds;
       }
 
       if (req.files['videoFile']) {
-        eventData.videoFile = `/uploads/${req.files['videoFile'][0].filename}`;
+        const uploadRes = await uploadToCloudinary(req.files['videoFile'][0].path, "events/videos", { resourceType: "video" });
+        if (uploadRes) {
+          eventData.videoFile = uploadRes.url;
+          eventData.videoFilePublicId = uploadRes.publicId;
+        }
       }
     }
     
@@ -98,32 +113,58 @@ exports.createEvent = async (req, res) => {
 exports.updateEvent = async (req, res) => {
   try {
     const eventData = { ...req.body };
-    
+    const existingEvent = await Event.findById(req.params.id);
+    if (!existingEvent) return res.status(404).json({ success: false, message: "Event not found" });
+
     // Process files if available
     if (req.files) {
       if (req.files['featuredImage']) {
-        eventData.featuredImage = `/uploads/${req.files['featuredImage'][0].filename}`;
+        const oldPublicId = existingEvent.featuredImagePublicId || extractPublicId(existingEvent.featuredImage);
+        if (oldPublicId) {
+          await deleteFromCloudinary(oldPublicId, "image");
+        }
+        const uploadRes = await uploadToCloudinary(req.files['featuredImage'][0].path, "events/images", { resourceType: "image" });
+        if (uploadRes) {
+          eventData.featuredImage = uploadRes.url;
+          eventData.featuredImagePublicId = uploadRes.publicId;
+        }
       }
       
       if (req.files['galleryImages']) {
+        if (existingEvent.galleryImagesPublicIds && existingEvent.galleryImagesPublicIds.length > 0) {
+          for (const pid of existingEvent.galleryImagesPublicIds) {
+            await deleteFromCloudinary(pid, "image");
+          }
+        }
         const galleryUrls = [];
+        const galleryPublicIds = [];
         for (const file of req.files['galleryImages']) {
-          galleryUrls.push(`/uploads/${file.filename}`);
+          const uploadRes = await uploadToCloudinary(file.path, "events/images", { resourceType: "image" });
+          if (uploadRes) {
+            galleryUrls.push(uploadRes.url);
+            galleryPublicIds.push(uploadRes.publicId);
+          }
         }
         eventData.galleryImages = galleryUrls;
+        eventData.galleryImagesPublicIds = galleryPublicIds;
       }
 
       if (req.files['videoFile']) {
-        eventData.videoFile = `/uploads/${req.files['videoFile'][0].filename}`;
+        const oldPublicId = existingEvent.videoFilePublicId || extractPublicId(existingEvent.videoFile);
+        if (oldPublicId) {
+          await deleteFromCloudinary(oldPublicId, "video");
+        }
+        const uploadRes = await uploadToCloudinary(req.files['videoFile'][0].path, "events/videos", { resourceType: "video" });
+        if (uploadRes) {
+          eventData.videoFile = uploadRes.url;
+          eventData.videoFilePublicId = uploadRes.publicId;
+        }
       }
     }
     
     if (eventData.tags && typeof eventData.tags === 'string') {
        eventData.tags = eventData.tags.split(',').map(tag => tag.trim());
     }
-
-    const existingEvent = await Event.findById(req.params.id);
-    if (!existingEvent) return res.status(404).json({ success: false, message: "Event not found" });
 
     if (req.user && req.user.role === 'BranchManager') {
       const userBranchStr = (req.user.branch?._id || req.user.branch || '').toString();
@@ -159,7 +200,24 @@ exports.deleteEvent = async (req, res) => {
       }
     }
 
+    // Delete Cloudinary assets
+    const featuredPid = existingEvent.featuredImagePublicId || extractPublicId(existingEvent.featuredImage);
+    if (featuredPid) await deleteFromCloudinary(featuredPid, "image");
+
+    if (existingEvent.galleryImagesPublicIds && existingEvent.galleryImagesPublicIds.length > 0) {
+      for (const pid of existingEvent.galleryImagesPublicIds) {
+        await deleteFromCloudinary(pid, "image");
+      }
+    }
+
+    const videoPid = existingEvent.videoFilePublicId || extractPublicId(existingEvent.videoFile);
+    if (videoPid) await deleteFromCloudinary(videoPid, "video");
+
     await Event.findByIdAndDelete(req.params.id);
+    
+    if(req.app.get('io')) req.app.get('io').emit('event_deleted', req.params.id);
+    
+    res.status(200).json({ success: true, message: "Event deleted successfully" });
     
     if(req.app.get('io')) req.app.get('io').emit('event_deleted', req.params.id);
     
