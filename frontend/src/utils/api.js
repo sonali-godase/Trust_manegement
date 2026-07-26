@@ -1,14 +1,25 @@
 import axios from 'axios';
 
+const getBaseUrl = () => {
+  let url = import.meta.env.VITE_API_URL || import.meta.env.VITE_ASSETS_URL || 'http://localhost:5000/api';
+  if (!url.endsWith('/api') && !url.endsWith('/api/')) {
+    url = `${url.replace(/\/$/, '')}/api`;
+  }
+  return url;
+};
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api', // adjust this for production
+  baseURL: getBaseUrl(),
 });
 
-
-// Request interceptor to add the Firebase token
+// Request interceptor to add token
 api.interceptors.request.use(
   (config) => {
-    const token = sessionStorage.getItem("token") || sessionStorage.getItem("documentAdminToken");
+    const token =
+      sessionStorage.getItem("token") ||
+      localStorage.getItem("token") ||
+      sessionStorage.getItem("documentAdminToken") ||
+      localStorage.getItem("documentAdminToken");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

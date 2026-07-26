@@ -161,7 +161,7 @@ const NoticeGenerator = () => {
                  <div className="w-[25%] text-center flex flex-col items-center justify-end">
                     <div className="text-[11pt] text-[#002366] font-bold mb-1">२९ वे पिठाधिपती</div>
                     <div className="w-[80px] h-[80px] rounded-full border-2 border-[#be1e4d] bg-gray-100 flex items-center justify-center overflow-hidden">
-                       <img src="http://localhost:5000/uploads/swami29.jpg" alt="Swami 29" className="w-full h-full object-cover" />
+                       <img src="/swami29.jpg" alt="Swami 29" className="w-full h-full object-cover" />
                     </div>
                  </div>
 
@@ -179,7 +179,7 @@ const NoticeGenerator = () => {
                     <div className="text-[9pt] text-[#be1e4d] font-bold mb-1">ट्रस्ट नं. ए/१७५० - सांगली</div>
                     <div className="text-[11pt] text-[#002366] font-bold mb-1">३० वे पिठाधिपती</div>
                     <div className="w-[80px] h-[80px] rounded-full border-2 border-[#be1e4d] bg-gray-100 flex items-center justify-center overflow-hidden">
-                       <img src="http://localhost:5000/uploads/swami30.jpg" alt="Swami 30" className="w-full h-full object-cover" />
+                       <img src="/swami30.jpg" alt="Swami 30" className="w-full h-full object-cover" />
                     </div>
                  </div>
 
