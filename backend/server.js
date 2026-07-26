@@ -17,8 +17,12 @@ const { Server } = require("socket.io");
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*", // allow all for now, in production specify frontend URL
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+    origin: [
+      "http://localhost:5173",
+      process.env.FRONTEND_URL
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    credentials: true
   }
 });
 
