@@ -4,6 +4,7 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api', // adjust this for production
 });
 
+
 // Request interceptor to add the Firebase token
 api.interceptors.request.use(
   (config) => {
