@@ -100,11 +100,7 @@ export const MyDonations = () => {
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              if (d.receiptPdfUrl && d.receiptPdfUrl.startsWith('http')) {
-                window.open(d.receiptPdfUrl, '_blank');
-              } else {
-                handleDownloadReceipt(d._id);
-              }
+              handleDownloadReceipt(d._id, d.donationReference);
             }}
             disabled={downloadingId === d._id}
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-wait"
@@ -123,7 +119,7 @@ export const MyDonations = () => {
     </tr>
   );
 
-  const handleDownloadReceipt = async (id) => {
+  const handleDownloadReceipt = async (id, donationRef) => {
     try {
       setDownloadingId(id);
       const res = await downloadDonationReceipt(id);
@@ -133,7 +129,8 @@ export const MyDonations = () => {
       
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `Donation_Receipt_${id}.pdf`);
+      const filename = donationRef ? `Donation_Receipt_${donationRef}.pdf` : `Donation_Receipt_${id}.pdf`;
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       

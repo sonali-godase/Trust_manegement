@@ -69,57 +69,52 @@ const ReceiptHistory = ({ defaultCategory = 'All', hideTitle = false, hideCatego
   };
 
   const handleDownload = async (receipt) => {
-    if (!receipt.pdfUrl) return;
-    
-    if (receipt.pdfUrl.startsWith('/api')) {
-      const toastId = toast.loading("Downloading document...");
-      try {
-        const fetchUrl = receipt.pdfUrl.replace('/api', '');
-        const response = await api.get(fetchUrl, { responseType: 'blob' });
-        const blob = new Blob([response.data], { type: 'application/pdf' });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `${receipt.category.replace(/\s+/g, '_')}_${receipt.receiptNumber}.pdf`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
-        toast.success("Downloaded successfully!", { id: toastId });
-      } catch (error) {
-        console.error("Failed to download PDF:", error);
-        toast.error("Failed to download PDF.", { id: toastId });
+    const toastId = toast.loading("Downloading document...");
+    try {
+      let fetchUrl;
+      if (receipt.pdfUrl && receipt.pdfUrl.startsWith('/api')) {
+        fetchUrl = receipt.pdfUrl.replace('/api', '');
+      } else {
+        const targetId = receipt.donationId || receipt._id;
+        fetchUrl = `/donations/${targetId}/receipt`;
       }
-    } else {
-      // Legacy static Cloudinary/local URL
+
+      const response = await api.get(fetchUrl, { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = receipt.pdfUrl;
-      link.target = "_blank";
-      link.download = `${receipt.category}_${receipt.receiptNumber}.pdf`;
+      link.href = url;
+      link.setAttribute('download', `${receipt.category.replace(/\s+/g, '_')}_${receipt.receiptNumber}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Downloaded successfully!", { id: toastId });
+    } catch (error) {
+      console.error("Failed to download PDF:", error);
+      toast.error("Failed to download PDF.", { id: toastId });
     }
   };
 
   const handleView = async (receipt) => {
-    if (!receipt.pdfUrl) return;
-
-    if (receipt.pdfUrl.startsWith('/api')) {
-      const toastId = toast.loading("Loading document...");
-      try {
-        const fetchUrl = receipt.pdfUrl.replace('/api', '');
-        const response = await api.get(fetchUrl, { responseType: 'blob' });
-        const blob = new Blob([response.data], { type: 'application/pdf' });
-        const url = window.URL.createObjectURL(blob);
-        window.open(url, '_blank');
-        toast.dismiss(toastId);
-      } catch (error) {
-        console.error("Failed to load PDF:", error);
-        toast.error("Failed to load PDF.", { id: toastId });
+    const toastId = toast.loading("Loading document...");
+    try {
+      let fetchUrl;
+      if (receipt.pdfUrl && receipt.pdfUrl.startsWith('/api')) {
+        fetchUrl = receipt.pdfUrl.replace('/api', '');
+      } else {
+        const targetId = receipt.donationId || receipt._id;
+        fetchUrl = `/donations/${targetId}/receipt`;
       }
-    } else {
-      window.open(receipt.pdfUrl, '_blank');
+
+      const response = await api.get(fetchUrl, { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      toast.dismiss(toastId);
+    } catch (error) {
+      console.error("Failed to load PDF:", error);
+      toast.error("Failed to load PDF.", { id: toastId });
     }
   };
 

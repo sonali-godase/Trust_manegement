@@ -190,11 +190,26 @@ exports.reviewDeletionRequest = async (req, res) => {
 
 exports.updateProfile = async (req, res) => {
   try {
-    const { name, mobile, password } = req.body;
+    const { name, mobile, password, currentPassword, newPassword } = req.body;
+    const targetNewPassword = newPassword || password;
     const trustee = await Trustee.findById(req.user._id);
 
     if (!trustee) {
       return res.status(404).json({ success: false, message: "Trustee not found" });
+    }
+
+    if (targetNewPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ success: false, message: "Current password is required to change password." });
+      }
+      const isMatch = await trustee.matchPassword(currentPassword);
+      if (!isMatch) {
+        return res.status(400).json({ success: false, message: "Incorrect current password." });
+      }
+      if (targetNewPassword.length < 6) {
+        return res.status(400).json({ success: false, message: "New password must be at least 6 characters long." });
+      }
+      trustee.password = targetNewPassword;
     }
 
     if (name) trustee.name = name;
@@ -213,7 +228,6 @@ exports.updateProfile = async (req, res) => {
         return res.status(400).json({ success: false, message: "Cloudinary upload failed. Please verify Cloudinary configuration." });
       }
     }
-    if (password) trustee.password = password;
 
     await trustee.save();
 

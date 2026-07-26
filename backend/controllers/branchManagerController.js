@@ -7,18 +7,32 @@ const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require(".
 
 exports.updateProfile = async (req, res) => {
   try {
-    const { name, email, mobile, password, address } = req.body;
+    const { name, email, mobile, password, currentPassword, newPassword, address } = req.body;
+    const targetNewPassword = newPassword || password;
     
     const manager = await BranchManager.findById(req.user._id);
     if (!manager) {
       return res.status(404).json({ success: false, message: "Branch Manager not found" });
     }
 
+    if (targetNewPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ success: false, message: "Current password is required to change password." });
+      }
+      const isMatch = await manager.matchPassword(currentPassword);
+      if (!isMatch) {
+        return res.status(400).json({ success: false, message: "Incorrect current password." });
+      }
+      if (targetNewPassword.length < 6) {
+        return res.status(400).json({ success: false, message: "New password must be at least 6 characters long." });
+      }
+      manager.password = targetNewPassword;
+    }
+
     if (name !== undefined) manager.name = name;
     if (email !== undefined) manager.email = email;
     if (mobile !== undefined) manager.mobile = mobile;
     if (address !== undefined) manager.address = address;
-    if (password !== undefined) manager.password = password; // Will be hashed by pre-save hook
 
     const file = req.file || (req.files && (req.files.profilePhoto?.[0] || req.files.profileImage?.[0]));
     if (file) {

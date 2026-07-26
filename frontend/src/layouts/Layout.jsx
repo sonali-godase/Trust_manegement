@@ -278,11 +278,6 @@ const Layout = ({ children, user }) => {
         showRedDot: unreadAnnouncementsCount > 0,
       },
       {
-        name: "Deletion Requests",
-        path: "/document-handler/deletion-requests",
-        icon: <FaTrash />,
-      },
-      {
         name: "Documents",
         path: "/document-handler/documents",
         icon: <FaFileAlt />,
@@ -331,7 +326,6 @@ const Layout = ({ children, user }) => {
       },
       { name: "Trustees", path: "/admin/trustees", icon: <FaUserShield /> },
       { name: "News", path: "/admin/news", icon: <FaBullhorn /> },
-      { name: "Issue Notice", path: "/admin/notice-generator", icon: <FaFileAlt /> },
     ];
   }
 

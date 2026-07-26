@@ -191,7 +191,7 @@ const AdminProfile = () => {
     setLoading(true);
     setSuccessMsg('');
     try {
-      const res = await api.put('/admins/password', {
+      const res = await api.put('/admins/profile', {
         currentPassword: securityData.currentPassword,
         newPassword: securityData.newPassword
       });
@@ -229,6 +229,9 @@ const AdminProfile = () => {
 
       await new Promise(res => setTimeout(res, 400)); 
       setSuccessMsg('Preferences saved successfully!');
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
     } catch (err) {
       console.error(err);
     } finally {

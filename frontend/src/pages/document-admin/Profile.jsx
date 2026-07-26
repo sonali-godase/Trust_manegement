@@ -140,7 +140,7 @@ const DocumentAdminProfile = () => {
     setSuccessMsg('');
     setErrorMsg('');
     try {
-      const res = await api.put('/document-admin/password', {
+      const res = await api.put('/document-admin/profile', {
         currentPassword: securityData.currentPassword,
         newPassword: securityData.newPassword
       });
@@ -178,6 +178,9 @@ const DocumentAdminProfile = () => {
 
       await new Promise(res => setTimeout(res, 400)); 
       setSuccessMsg('Preferences saved successfully!');
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
     } catch (err) {
       console.error(err);
       setErrorMsg('Failed to save preferences.');

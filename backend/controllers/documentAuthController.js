@@ -188,7 +188,8 @@ exports.updateAdmin = async (req, res) => {
 // Document Handler self-update methods
 exports.updateProfile = async (req, res) => {
   try {
-    const { contactNo, name, address } = req.body;
+    const { contactNo, name, address, currentPassword, newPassword, password } = req.body;
+    const targetNewPassword = newPassword || password;
     
     // Check for either req.user._id or req.user.id depending on auth middleware
     const adminId = req.user._id || req.user.id;
@@ -196,6 +197,20 @@ exports.updateProfile = async (req, res) => {
     const admin = await DocumentAdmin.findById(adminId);
     if (!admin) {
       return res.status(404).json({ success: false, message: "Admin not found" });
+    }
+
+    if (targetNewPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ success: false, message: "Current password is required to change password." });
+      }
+      const isMatch = await admin.matchPassword(currentPassword);
+      if (!isMatch) {
+        return res.status(400).json({ success: false, message: "Incorrect current password." });
+      }
+      if (targetNewPassword.length < 6) {
+        return res.status(400).json({ success: false, message: "New password must be at least 6 characters long." });
+      }
+      admin.password = targetNewPassword;
     }
 
     if (contactNo !== undefined) admin.contactNo = contactNo;

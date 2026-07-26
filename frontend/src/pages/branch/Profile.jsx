@@ -136,7 +136,10 @@ const Profile = () => {
     }
     setLoading(true);
     try {
-      await api.put('/branch-managers/profile', { password: passwords.new });
+      await api.put('/branch-managers/profile', {
+        currentPassword: passwords.old,
+        newPassword: passwords.new
+      });
       setMessage({ type: 'success', text: 'Password changed successfully.' });
       setPasswords({ old: '', new: '', confirm: '' });
     } catch (err) {

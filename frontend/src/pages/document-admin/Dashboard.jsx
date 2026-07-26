@@ -270,13 +270,13 @@ const DocumentAdminDashboard = () => {
           </div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between group hover:shadow-md transition-shadow">
             <div>
-              <p className="text-sm text-slate-500 mb-1">Pending Deletion</p>
+              <p className="text-sm text-slate-500 mb-1">Approval Requests</p>
               <h3 className="text-3xl font-bold text-amber-600">
-                <AnimatedCounter value={allDocuments.filter(d => d.deleteStatus === 'Pending').length} />
+                <AnimatedCounter value={myRequests.filter(r => r.status === 'Pending').length} />
               </h3>
             </div>
             <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center text-amber-600 group-hover:scale-110 transition-transform">
-              <FiTrash2 className="text-xl" />
+              <FiClock className="text-xl" />
             </div>
           </div>
         </div>

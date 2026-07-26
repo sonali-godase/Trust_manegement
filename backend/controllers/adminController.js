@@ -404,12 +404,26 @@ exports.updateSystemSettings = async (req, res) => {
 // Update Admin Self Profile
 exports.updateProfile = async (req, res) => {
   try {
-    const { name, email, mobile, address } = req.body;
-    const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require("../utils/cloudinaryHelper");
+    const { name, email, mobile, address, currentPassword, newPassword, password } = req.body;
+    const targetNewPassword = newPassword || password;
 
     const admin = await Admin.findById(req.user._id);
     if (!admin) {
       return res.status(404).json({ success: false, message: "Admin not found" });
+    }
+
+    if (targetNewPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ success: false, message: "Current password is required to change password." });
+      }
+      const isMatch = await admin.matchPassword(currentPassword);
+      if (!isMatch) {
+        return res.status(400).json({ success: false, message: "Incorrect current password." });
+      }
+      if (targetNewPassword.length < 6) {
+        return res.status(400).json({ success: false, message: "New password must be at least 6 characters long." });
+      }
+      admin.password = targetNewPassword;
     }
 
     if (name) admin.name = name;
