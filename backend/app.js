@@ -57,8 +57,18 @@ app.use("/api/audio", require("./routes/audioRoutes"));
 app.use("/api/receipts", require("./routes/receiptArchiveRoutes"));
 app.use("/api/correspondence", require("./routes/correspondenceRoutes"));
 
-app.get("/", (req, res) => {
-  res.send("Temple Management System API is running...");
-});
+const fs = require("fs");
+const frontendDistPath = path.join(__dirname, "../frontend/dist");
+if (fs.existsSync(frontendDistPath)) {
+  app.use(express.static(frontendDistPath));
+  app.get("/{*path}", (req, res, next) => {
+    if (req.path.startsWith("/api/")) return next();
+    res.sendFile(path.join(frontendDistPath, "index.html"));
+  });
+} else {
+  app.get("/", (req, res) => {
+    res.send("Temple Management System API is running...");
+  });
+}
 
 module.exports = app;
