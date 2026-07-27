@@ -187,11 +187,29 @@ const Receipt = ({ donation, isUserSide = true }) => {
   if (lang === 'en' && purposeMapping[purposeTextRaw]) purposeTextRaw = purposeMapping[purposeTextRaw];
   if (lang === 'mr' && purposeMapping[purposeTextRaw]) purposeTextRaw = purposeMapping[purposeTextRaw];
 
-  const amountWords = amountWordsRaw;
-  const purposeText = purposeTextRaw;
-
   const receiptCategory = (donation.category || donation.type || donation.receiptType || donation.donationType || '').toLowerCase();
   const showSwamiji = receiptCategory.includes('shakha') || receiptCategory.includes('branch');
+
+  const getCategoryTitle = () => {
+    if (receiptCategory.includes('jama')) {
+      return lang === 'mr' ? 'जमा पावती' : 'JAMA RECEIPT';
+    }
+    if (receiptCategory.includes('shakha') || receiptCategory.includes('branch')) {
+      return lang === 'mr' ? 'शाखा पावती' : 'BRANCH RECEIPT';
+    }
+    if (receiptCategory.includes('annadan')) {
+      return lang === 'mr' ? 'अन्नदान पावती' : 'ANNADAN RECEIPT';
+    }
+    if (receiptCategory.includes('prasad')) {
+      return lang === 'mr' ? 'प्रसाद पावती' : 'PRASAD RECEIPT';
+    }
+    if (receiptCategory.includes('expense') || receiptCategory.includes('payment')) {
+      return lang === 'mr' ? 'खर्च पावती' : 'PAYMENT RECEIPT';
+    }
+    return lang === 'mr' ? 'देणगी पावती' : 'DONATION RECEIPT';
+  };
+
+  const receiptTitle = getCategoryTitle();
 
   const toggleLanguage = () => {
     setLang(lang === 'mr' ? 'en' : 'mr');
@@ -247,7 +265,7 @@ const Receipt = ({ donation, isUserSide = true }) => {
               <path d="M 0,0 L 80,0 L 68,28 L 0,28 Z" fill="#8B2D3B" />
               <path d="M 83,0 L 240,0 L 240,28 L 71,28 Z" fill="#EEEEEE" stroke="#8B2D3B" strokeWidth="1" />
             </svg>
-            <div className="ribbon-label-pavti" style={{ left: '16px' }}>{t.receipt}</div>
+            <div className="ribbon-label-pavti" style={{ left: '16px' }}>{receiptTitle}</div>
             <div className="ribbon-label-shakha" style={{ left: '88px' }}>
               <span style={{ color: '#8B2D3B' }}>{t.branchMath}</span>
               <span className="handwritten-val-inline">{branchName}</span>
@@ -369,8 +387,8 @@ const Receipt = ({ donation, isUserSide = true }) => {
                   <path d="M 0,0 L 80,0 L 70,24 L 0,24 Z" fill="#8B2D3B" />
                   <path d="M 83,0 L 260,0 L 260,24 L 73,24 Z" fill="#EEEEEE" stroke="#8B2D3B" strokeWidth="0.75" />
                 </svg>
-                <div style={{ position: 'absolute', left: '0px', top: '0px', width: '73px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D8B321', fontFamily: "'Noto Sans Devanagari', sans-serif", fontWeight: '900', fontSize: '10px' }}>
-                  {t.receipt}
+                <div style={{ position: 'absolute', left: '0px', top: '0px', width: '73px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D8B321', fontFamily: "'Noto Sans Devanagari', sans-serif", fontWeight: '900', fontSize: '9px', textTransform: 'uppercase' }}>
+                  {receiptTitle}
                 </div>
                 <div style={{ position: 'absolute', left: '82px', top: '0px', height: '24px', display: 'flex', alignItems: 'center', fontFamily: "'Noto Sans Devanagari', sans-serif", fontWeight: '700', fontSize: '9px', gap: '3px' }}>
                   <span style={{ color: '#8B2D3B' }}>{t.branchMath}</span>
