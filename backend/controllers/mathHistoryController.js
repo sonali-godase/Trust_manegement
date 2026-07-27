@@ -1,6 +1,5 @@
 const MathHistory = require('../models/MathHistory');
-const fs = require('fs');
-const path = require('path');
+const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require('../utils/cloudinaryHelper');
 
 // Get all records (Admin/Trustee view)
 exports.getAllRecords = async (req, res) => {
@@ -29,17 +28,20 @@ exports.createRecord = async (req, res) => {
     let media = [];
 
     if (req.files && req.files.length > 0) {
-      media = req.files.map(file => {
-        // Determine type based on mimetype
+      for (const file of req.files) {
         let type = 'document';
         if (file.mimetype.startsWith('image/')) type = 'image';
         else if (file.mimetype.startsWith('video/')) type = 'video';
         
-        return {
-          url: `/uploads/${file.filename}`,
-          type
-        };
-      });
+        const uploadRes = await uploadToCloudinary(file, 'math_history', { resourceType: 'auto' });
+        if (uploadRes) {
+          media.push({
+            url: uploadRes.url,
+            type,
+            publicId: uploadRes.publicId
+          });
+        }
+      }
     }
 
     const newRecord = new MathHistory({
@@ -65,27 +67,45 @@ exports.updateRecord = async (req, res) => {
     const { id } = req.params;
     const { title, era, content, category, status, order } = req.body;
 
-    let updateData = { title, era, content, category, status, order };
+    const existingRecord = await MathHistory.findById(id);
+    if (!existingRecord) {
+      return res.status(404).json({ success: false, message: 'Record not found' });
+    }
+
+    let media = existingRecord.media || [];
 
     if (req.files && req.files.length > 0) {
-      const media = req.files.map(file => {
+      const newMedia = [];
+      for (const file of req.files) {
         let type = 'document';
         if (file.mimetype.startsWith('image/')) type = 'image';
         else if (file.mimetype.startsWith('video/')) type = 'video';
         
-        return {
-          url: `/uploads/${file.filename}`,
-          type
-        };
-      });
-      // Optionally could append or replace. For simplicity, replace if new files uploaded.
-      updateData.media = media;
+        const uploadRes = await uploadToCloudinary(file, 'math_history', { resourceType: 'auto' });
+        if (uploadRes) {
+          newMedia.push({
+            url: uploadRes.url,
+            type,
+            publicId: uploadRes.publicId
+          });
+        }
+      }
+      if (newMedia.length > 0) {
+        media = [...media, ...newMedia];
+      }
     }
 
+    const updateData = {
+      title,
+      era,
+      content,
+      category,
+      status,
+      order: order !== undefined ? parseInt(order) : existingRecord.order,
+      media
+    };
+
     const updatedRecord = await MathHistory.findByIdAndUpdate(id, updateData, { returnDocument: 'after' });
-    if (!updatedRecord) {
-      return res.status(404).json({ success: false, message: 'Record not found' });
-    }
 
     res.status(200).json({ success: true, data: updatedRecord });
   } catch (error) {

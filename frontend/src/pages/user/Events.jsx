@@ -10,7 +10,8 @@ import api from "../../utils/api";
 import { getCurrentLiveStream, getLiveStreamsHistory } from "../../services/liveService";
 import EventMedia from "../../components/EventMedia";
 
-const ASSETS_URL = import.meta.env.VITE_ASSETS_URL || "http://localhost:5000";
+const BACKEND_URL = import.meta.env.VITE_ASSETS_URL || (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '') : "http://localhost:5000");
+const ASSETS_URL = BACKEND_URL;
 
 const getImageUrl = (url) => {
   if (!url) return "/about_images/kolekar_real_1.jpg";
@@ -74,7 +75,7 @@ const UserEvents = () => {
     setSelectedMonth("all");
     setSearchQuery("");
 
-    const socket = io(import.meta.env.VITE_ASSETS_URL || "http://localhost:5000");
+    const socket = io(BACKEND_URL);
 
     socket.on("event_created", (newEvent) => {
       if (newEvent.isPublished) {

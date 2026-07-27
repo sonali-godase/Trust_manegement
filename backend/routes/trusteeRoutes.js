@@ -37,5 +37,6 @@ router.put("/documents/:id/review-deletion", checkPermission('Documents'), trust
 // Profile Route
 router.get("/profile/logins", trusteeController.getRecentLogins);
 router.put("/profile", upload.single('profileImage'), trusteeController.updateProfile);
+router.post("/verify-password", trusteeController.verifyPassword);
 
 module.exports = router;

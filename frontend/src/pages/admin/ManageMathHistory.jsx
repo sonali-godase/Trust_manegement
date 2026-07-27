@@ -39,26 +39,34 @@ const ManageMathHistory = () => {
     fetchHistory();
   }, []);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
       const form = new FormData();
       Object.keys(formData).forEach(key => form.append(key, formData[key]));
       
-      Array.from(mediaFiles).forEach(file => {
-        form.append('media', file);
-      });
+      if (mediaFiles && mediaFiles.length > 0) {
+        Array.from(mediaFiles).forEach(file => {
+          form.append('media', file);
+        });
+      }
 
       if (editingId) {
-        await api.put(`/math-history/${editingId}`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+        await api.put(`/math-history/${editingId}`, form);
       } else {
-        await api.post('/math-history', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+        await api.post('/math-history', form);
       }
       setIsModalOpen(false);
-      setEditingId(null);
+      resetForm();
       fetchHistory();
     } catch (err) {
+      console.error(err);
       alert(err.response?.data?.message || 'Error saving history record');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -267,8 +275,8 @@ const ManageMathHistory = () => {
 
                 <div className="pt-6 flex flex-col md:flex-row justify-end gap-3 border-t border-gray-100">
                   <button type="button" onClick={() => setIsModalOpen(false)} className="w-full md:w-auto px-5 py-2.5 rounded-xl text-gray-600 hover:bg-gray-100 font-bold transition-colors order-2 md:order-1">Cancel</button>
-                  <button type="submit" className="order-1 md:order-2 bg-blue-900 hover:bg-slate-900 w-full md:w-auto justify-center text-white px-8 py-2.5 rounded-xl font-black transition-colors shadow-lg">
-                    {editingId ? 'Save Changes' : 'Create Record'}
+                  <button type="submit" disabled={isSubmitting} className="order-1 md:order-2 bg-blue-900 hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed w-full md:w-auto justify-center text-white px-8 py-2.5 rounded-xl font-black transition-colors shadow-lg">
+                    {isSubmitting ? 'Saving...' : (editingId ? 'Save Changes' : 'Create Record')}
                   </button>
                 </div>
 

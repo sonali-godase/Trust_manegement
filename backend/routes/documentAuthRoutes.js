@@ -16,6 +16,7 @@ router.post("/", authMiddleware, createAdmin);
 
 // Document Handler self-management routes
 router.put("/profile", authMiddleware, upload.single("profileImage"), require("../controllers/documentAuthController").updateProfile);
+router.post("/verify-password", authMiddleware, require("../controllers/documentAuthController").verifyPassword);
 router.put("/password", authMiddleware, require("../controllers/documentAuthController").updatePassword);
 router.put("/:id", authMiddleware, require("../controllers/documentAuthController").updateAdmin);
 router.delete("/:id", authMiddleware, deleteAdmin);

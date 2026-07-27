@@ -9,6 +9,7 @@ const upload = require("../middleware/uploadMiddleware");
 router.use(authMiddleware, checkRole("BranchManager"));
 
 router.put("/profile", upload.single("profileImage"), branchManagerController.updateProfile);
+router.post("/verify-password", branchManagerController.verifyPassword);
 router.get("/stats", branchManagerController.getStats);
 router.get("/donations", branchManagerController.getBranchDonations);
 router.get("/events", branchManagerController.getBranchEvents);

@@ -265,3 +265,24 @@ exports.updatePassword = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+exports.verifyPassword = async (req, res) => {
+  try {
+    const { currentPassword } = req.body;
+    if (!currentPassword) {
+      return res.status(400).json({ success: false, message: "Current password is required." });
+    }
+    const admin = await DocumentAdmin.findById(req.user._id || req.user.id);
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Document Admin not found." });
+    }
+    const isMatch = await admin.matchPassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({ success: false, message: "Invalid current password." });
+    }
+    return res.status(200).json({ success: true, message: "Current password verified successfully." });
+  } catch (err) {
+    console.error("[documentAuthController][ERROR] verifyPassword:", err.message);
+    res.status(500).json({ success: false, message: err.message || "Server Error" });
+  }
+};

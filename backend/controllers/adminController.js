@@ -457,3 +457,24 @@ exports.updateProfile = async (req, res) => {
     res.status(500).json({ success: false, message: err.message || "Failed to update profile." });
   }
 };
+
+exports.verifyPassword = async (req, res) => {
+  try {
+    const { currentPassword } = req.body;
+    if (!currentPassword) {
+      return res.status(400).json({ success: false, message: "Current password is required." });
+    }
+    const admin = await Admin.findById(req.user._id || req.user.id);
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Admin not found." });
+    }
+    const isMatch = await admin.matchPassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({ success: false, message: "Invalid current password." });
+    }
+    return res.status(200).json({ success: true, message: "Current password verified successfully." });
+  } catch (err) {
+    console.error("[adminController][ERROR] verifyPassword:", err.message);
+    res.status(500).json({ success: false, message: err.message || "Server Error" });
+  }
+};

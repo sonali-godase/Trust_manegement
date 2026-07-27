@@ -278,3 +278,24 @@ exports.getRecentLogins = async (req, res) => {
 const documentRequestController = require("./documentRequestController");
 exports.getDocumentRequests = documentRequestController.getDocumentRequests;
 exports.processDocumentRequest = documentRequestController.processDocumentRequest;
+
+exports.verifyPassword = async (req, res) => {
+  try {
+    const { currentPassword } = req.body;
+    if (!currentPassword) {
+      return res.status(400).json({ success: false, message: "Current password is required." });
+    }
+    const trustee = await Trustee.findById(req.user._id || req.user.id);
+    if (!trustee) {
+      return res.status(404).json({ success: false, message: "Trustee not found." });
+    }
+    const isMatch = await trustee.matchPassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({ success: false, message: "Invalid current password." });
+    }
+    return res.status(200).json({ success: true, message: "Current password verified successfully." });
+  } catch (err) {
+    console.error("[trusteeController][ERROR] verifyPassword:", err.message);
+    res.status(500).json({ success: false, message: err.message || "Server Error" });
+  }
+};

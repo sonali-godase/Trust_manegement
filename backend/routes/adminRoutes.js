@@ -10,6 +10,7 @@ router.use(authMiddleware, checkRole("Admin"));
 
 router.get("/stats", adminController.getStats);
 router.put("/profile", upload.single("profileImage"), adminController.updateProfile);
+router.post("/verify-password", adminController.verifyPassword);
 
 // Trustees
 router.get("/trustees", adminController.getTrustees);

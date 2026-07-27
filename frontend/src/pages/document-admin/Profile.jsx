@@ -33,108 +33,46 @@ const DocumentAdminProfile = () => {
     newPassword: '',
     confirmPassword: ''
   });
-  const [showPassword, setShowPassword] = useState(false);
+  const [isPasswordVerified, setIsPasswordVerified] = useState(false);
+  const [verifyingPassword, setVerifyingPassword] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const [preferences, setPreferences] = useState({
-    language: 'English',
-    showActivities: true, showBranches: true, showDonations: true, showEvents: true
-  });
-  
-  useEffect(() => {
-    const savedPrefs = localStorage.getItem('adminPreferences');
-    if (savedPrefs) {
-      try {
-        setPreferences(prev => ({ ...prev, ...JSON.parse(savedPrefs) }));
-      } catch (e) {
-        console.error("Failed to parse preferences", e);
-      }
+  const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+
+  const handleVerifyPassword = async () => {
+    if (!securityData.currentPassword) {
+      return setErrorMsg("Please enter your current password first.");
     }
-  }, []);
-
-  const handleTogglePref = (key) => {
-    setPreferences(prev => {
-      const updated = { ...prev, [key]: !prev[key] };
-      localStorage.setItem('adminPreferences', JSON.stringify(updated));
-      window.dispatchEvent(new Event('preferencesUpdated'));
-      return updated;
-    });
-  };
-
-  
-  const Toggle = ({ enabled, onChange }) => (
-    <div 
-      onClick={onChange}
-      className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ${enabled ? 'bg-sky-500' : 'bg-gray-300'}`}
-    >
-      <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${enabled ? 'translate-x-6' : ''}`} />
-    </div>
-  );
-
-  useEffect(() => {
-    if (user) {
-      setFormData({
-        name: user.name || '',
-        email: user.email || '',
-        contactNo: user.contactNo || '',
-        address: user.address || ''
-      });
-      if (user.profilePhoto) {
-        const photoUrl = user.profilePhoto.startsWith('http') 
-          ? user.profilePhoto 
-          : `${API_URL.replace(/\/api$/, '')}${user.profilePhoto.startsWith('/') ? '' : '/'}${user.profilePhoto}`;
-        setImagePreview(photoUrl);
-      }
-    }
-  }, [user]);
-
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setProfileImage(file);
-      setImagePreview(URL.createObjectURL(file));
-      setIsEditing(true); // Auto enable edit mode if they change photo
-    }
-  };
-
-  const handleUpdateProfile = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setSuccessMsg('');
+    setVerifyingPassword(true);
     setErrorMsg('');
     try {
-      const data = new FormData();
-      data.append('name', formData.name);
-      data.append('contactNo', formData.contactNo);
-      data.append('address', formData.address);
-      if (profileImage) {
-        data.append('profileImage', profileImage);
-      }
-
-      const res = await api.put('/document-admin/profile', data, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const res = await api.post('/document-admin/verify-password', { currentPassword: securityData.currentPassword });
       if (res.data.success) {
-        login(sessionStorage.getItem('token') || localStorage.getItem('token'), res.data.data);
-        setSuccessMsg('Profile information updated successfully!');
-        setIsEditing(false);
+        setIsPasswordVerified(true);
+        setSuccessMsg("Current password verified. You may now set a new password.");
       } else {
-        setErrorMsg(res.data.message || 'Failed to update profile.');
+        setErrorMsg(res.data.message || "Invalid current password.");
       }
     } catch (err) {
-      console.error(err);
-      setErrorMsg(err.response?.data?.message || 'Failed to update profile.');
+      setErrorMsg(err.response?.data?.message || "Invalid current password.");
+      setIsPasswordVerified(false);
     } finally {
-      setLoading(false);
+      setVerifyingPassword(false);
     }
   };
 
   const handleUpdateSecurity = async (e) => {
     e.preventDefault();
+    if (!isPasswordVerified) {
+      return setErrorMsg("Please verify your current password first.");
+    }
+    if (!PASSWORD_REGEX.test(securityData.newPassword)) {
+      return setErrorMsg("Password must be at least 8 characters long and contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character (@$!%*?&).");
+    }
     if (securityData.newPassword !== securityData.confirmPassword) {
       return setErrorMsg("Passwords do not match");
-    }
-    if (!/^[a-zA-Z0-9]+$/.test(securityData.newPassword)) {
-      return setErrorMsg("Password must contain only alphanumeric characters");
     }
     setLoading(true);
     setSuccessMsg('');
@@ -147,6 +85,7 @@ const DocumentAdminProfile = () => {
       if (res.data.success) {
         setSuccessMsg('Security settings updated successfully!');
         setSecurityData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        setIsPasswordVerified(false);
       } else {
         setErrorMsg(res.data.message || 'Failed to update security settings.');
       }
@@ -343,26 +282,71 @@ const DocumentAdminProfile = () => {
                 <form onSubmit={handleUpdateSecurity} className="max-w-md space-y-5">
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Current Password</label>
-                    <div className="relative">
-                      <input type={showPassword ? "text" : "password"} required value={securityData.currentPassword} onChange={e => setSecurityData({...securityData, currentPassword: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:border-sky-500 focus:bg-white focus:ring-1 focus:ring-sky-500 transition-all" />
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                        {showPassword ? <FiEyeOff /> : <FiEye />}
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input 
+                          type={showCurrentPassword ? "text" : "password"} 
+                          required 
+                          value={securityData.currentPassword} 
+                          onChange={e => {
+                            setSecurityData({...securityData, currentPassword: e.target.value});
+                            setIsPasswordVerified(false);
+                          }} 
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:border-sky-500 focus:bg-white focus:ring-1 focus:ring-sky-500 transition-all" 
+                        />
+                        <button type="button" onClick={() => setShowCurrentPassword(!showCurrentPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                          {showCurrentPassword ? <FiEyeOff /> : <FiEye />}
+                        </button>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={handleVerifyPassword} 
+                        disabled={verifyingPassword || !securityData.currentPassword}
+                        className={`px-4 py-3 rounded-xl font-bold text-xs transition-colors shadow-sm shrink-0 ${isPasswordVerified ? 'bg-emerald-600 text-white' : 'bg-sky-600 hover:bg-sky-700 text-white disabled:opacity-50'}`}
+                      >
+                        {verifyingPassword ? 'Verifying...' : isPasswordVerified ? '✓ Verified' : 'Verify'}
                       </button>
                     </div>
                   </div>
                   
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">New Password</label>
-                    <input type={showPassword ? "text" : "password"} required minLength={6} value={securityData.newPassword} onChange={e => setSecurityData({...securityData, newPassword: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:border-sky-500 focus:bg-white focus:ring-1 focus:ring-sky-500 transition-all" />
+                    <div className="relative">
+                      <input 
+                        type={showNewPassword ? "text" : "password"} 
+                        required 
+                        disabled={!isPasswordVerified}
+                        value={securityData.newPassword} 
+                        onChange={e => setSecurityData({...securityData, newPassword: e.target.value})} 
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:border-sky-500 focus:bg-white focus:ring-1 focus:ring-sky-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed" 
+                        placeholder={!isPasswordVerified ? "Verify current password first" : "Min 8 chars, 1 upper, 1 lower, 1 num, 1 special"}
+                      />
+                      <button type="button" disabled={!isPasswordVerified} onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:opacity-50">
+                        {showNewPassword ? <FiEyeOff /> : <FiEye />}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Confirm New Password</label>
-                    <input type={showPassword ? "text" : "password"} required minLength={6} value={securityData.confirmPassword} onChange={e => setSecurityData({...securityData, confirmPassword: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:border-sky-500 focus:bg-white focus:ring-1 focus:ring-sky-500 transition-all" />
+                    <div className="relative">
+                      <input 
+                        type={showConfirmPassword ? "text" : "password"} 
+                        required 
+                        disabled={!isPasswordVerified}
+                        value={securityData.confirmPassword} 
+                        onChange={e => setSecurityData({...securityData, confirmPassword: e.target.value})} 
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:border-sky-500 focus:bg-white focus:ring-1 focus:ring-sky-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed" 
+                        placeholder={!isPasswordVerified ? "Verify current password first" : "Re-enter new password"}
+                      />
+                      <button type="button" disabled={!isPasswordVerified} onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:opacity-50">
+                        {showConfirmPassword ? <FiEyeOff /> : <FiEye />}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="pt-4">
-                    <button type="submit" disabled={loading} className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold shadow-md transition-colors flex justify-center items-center gap-2 disabled:opacity-50">
+                    <button type="submit" disabled={loading || !isPasswordVerified} className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold shadow-md transition-colors flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                       {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : 'Update Password'}
                     </button>
                   </div>

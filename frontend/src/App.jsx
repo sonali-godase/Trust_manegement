@@ -242,6 +242,7 @@ function AppRoutes() {
           <Route path="/trustee/contact-enquiries" element={<RoleProtectedRoute allowedRoles={['Trustee', 'Admin']}><TrusteeContactEnquiries /></RoleProtectedRoute>} />
           <Route path="/trustee/notice-generator" element={<RoleProtectedRoute allowedRoles={['Trustee', 'Admin', 'BranchManager']}><NoticeGenerator /></RoleProtectedRoute>} />
           <Route path="/trustee/issue-notice" element={<RoleProtectedRoute allowedRoles={['Trustee', 'Admin', 'BranchManager']}><NoticeGenerator /></RoleProtectedRoute>} />
+          <Route path="/trustee/receipts" element={<RoleProtectedRoute allowedRoles={['Trustee', 'Admin']}><ReceiptHistory /></RoleProtectedRoute>} />
 
           {/* Branch Manager Protected Routes */}
           <Route path="/branch/dashboard" element={<RoleProtectedRoute allowedRoles={['BranchManager']}><BranchDashboard /></RoleProtectedRoute>} />

@@ -23,115 +23,47 @@ const Profile = () => {
   
   // Tab 2: Security Settings
   const [passwords, setPasswords] = useState({ old: '', new: '', confirm: '' });
-  const [showPassword, setShowPassword] = useState(false);
-  const [securitySettings, setSecuritySettings] = useState({
-    twoFactor: false, sessionTimeout: true, deviceVerification: true
-  });
-  
-  // Tab 3: Preferences
-  const [preferences, setPreferences] = useState({
-    notifyEmail: true, notifySms: false, notifyDonation: true, notifyEvent: true, notifyAnnadan: false,
-    language: 'English',
-    showActivities: true, showBranches: true, showDonations: true, showEvents: true
-  });
+  const [isPasswordVerified, setIsPasswordVerified] = useState(false);
+  const [verifyingPassword, setVerifyingPassword] = useState(false);
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  useEffect(() => {
-    // Load preferences from global adminPreferences for consistency
-    const savedPrefs = localStorage.getItem('adminPreferences');
-    if (savedPrefs) {
-      try {
-        const parsed = JSON.parse(savedPrefs);
-        setPreferences(prev => ({ ...prev, ...parsed }));
-      } catch (e) {
-        console.error("Failed to parse preferences", e);
-      }
+  const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+
+  const handleVerifyPassword = async () => {
+    if (!passwords.old) {
+      return setMessage({ type: 'error', text: 'Please enter your current password first.' });
     }
-  }, []);
-
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
-
-  useEffect(() => {
-    if (user) {
-      setPersonalInfo({
-        name: user.displayName || user.name || '',
-        email: user.email || '',
-        mobile: user.mobile || user.phone || '',
-        managerId: user.managerId || user._id?.substring(0, 10).toUpperCase() || 'BM-001',
-        joiningDate: user.createdAt ? new Date(user.createdAt).toISOString().split('T')[0] : 'Not Available',
-        address: user.address || '',
-        profilePhoto: user.profilePhoto || ''
-      });
-      if (user.profilePhoto) {
-        const photoUrl = user.profilePhoto.startsWith('http') 
-          ? user.profilePhoto 
-          : `${API_URL.replace(/\/api$/, '')}${user.profilePhoto.startsWith('/') ? '' : '/'}${user.profilePhoto}`;
-        setImagePreview(photoUrl);
-      }
-    }
-  }, [user]);
-
-  const handlePersonalChange = (e) => setPersonalInfo({ ...personalInfo, [e.target.name]: e.target.value });
-  
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setProfileImageFile(file);
-      setImagePreview(URL.createObjectURL(file));
-    }
-  };
-
-  const handlePasswordChange = (e) => setPasswords({ ...passwords, [e.target.name]: e.target.value });
-  
-  const handleToggleSecurity = (key) => setSecuritySettings(prev => ({ ...prev, [key]: !prev[key] }));
-  
-  const handleTogglePref = (key) => {
-    setPreferences(prev => {
-      const updated = { ...prev, [key]: !prev[key] };
-      localStorage.setItem('adminPreferences', JSON.stringify(updated));
-      window.dispatchEvent(new Event('preferencesUpdated'));
-      return updated;
-    });
-  };
-
-
-  const handleSavePersonalInfo = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage({ type: '', text: '' });
+    setVerifyingPassword(true);
     try {
-      const dataToUpdate = new FormData();
-      dataToUpdate.append('name', personalInfo.name);
-      dataToUpdate.append('email', personalInfo.email); // Editable email
-      dataToUpdate.append('mobile', personalInfo.mobile);
-      dataToUpdate.append('address', personalInfo.address); // Address added
-      if (profileImageFile) {
-        dataToUpdate.append('profileImage', profileImageFile);
-      }
-      
-      const res = await api.put('/branch-managers/profile', dataToUpdate, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const res = await api.post('/branch-managers/verify-password', { currentPassword: passwords.old });
       if (res.data.success) {
-        login(sessionStorage.getItem('token') || localStorage.getItem('token'), res.data.user);
+        setIsPasswordVerified(true);
+        setMessage({ type: 'success', text: 'Current password verified. You may now set a new password.' });
+      } else {
+        setMessage({ type: 'error', text: res.data.message || 'Invalid current password.' });
       }
-      setMessage({ type: 'success', text: 'Personal information updated successfully!' });
     } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.message || 'Failed to update profile.' });
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Invalid current password.' });
+      setIsPasswordVerified(false);
     } finally {
-      setLoading(false);
-      setTimeout(() => setMessage({ type: '', text: '' }), 5000);
+      setVerifyingPassword(false);
     }
   };
 
   const handleSavePassword = async (e) => {
     e.preventDefault();
-    if(passwords.new !== passwords.confirm) {
-      setMessage({ type: 'error', text: 'New passwords do not match.' });
+    if (!isPasswordVerified) {
+      setMessage({ type: 'error', text: 'Please verify your current password first.' });
       return;
     }
-    if (!/^[a-zA-Z0-9]+$/.test(passwords.new)) {
-      setMessage({ type: 'error', text: 'Password must contain only alphanumeric characters.' });
+    if (!PASSWORD_REGEX.test(passwords.new)) {
+      setMessage({ type: 'error', text: 'Password must be at least 8 characters long and contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character (@$!%*?&).' });
+      return;
+    }
+    if(passwords.new !== passwords.confirm) {
+      setMessage({ type: 'error', text: 'New passwords do not match.' });
       return;
     }
     setLoading(true);
@@ -142,6 +74,7 @@ const Profile = () => {
       });
       setMessage({ type: 'success', text: 'Password changed successfully.' });
       setPasswords({ old: '', new: '', confirm: '' });
+      setIsPasswordVerified(false);
     } catch (err) {
       setMessage({ type: 'error', text: err.response?.data?.message || 'Failed to update password.' });
     } finally {
@@ -296,28 +229,79 @@ const Profile = () => {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Key className="w-5 h-5 text-sky-500"/> Change Password</h3>
                 <form onSubmit={handleSavePassword} className="space-y-5 max-w-md">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Old Password</label>
-                    <input type="password" name="old" value={passwords.old} onChange={handlePasswordChange} required 
-                      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none transition-all" />
-                  </div>
-                  <div className="space-y-2 relative">
-                    <label className="text-sm font-medium text-gray-700">New Password</label>
-                    <div className="relative">
-                      <input type={showPassword ? "text" : "password"} name="new" value={passwords.new} onChange={handlePasswordChange} required 
-                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none transition-all pr-12" />
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    <label className="text-sm font-medium text-gray-700">Current Password</label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input 
+                          type={showOldPassword ? "text" : "password"} 
+                          name="old" 
+                          value={passwords.old} 
+                          onChange={e => {
+                            handlePasswordChange(e);
+                            setIsPasswordVerified(false);
+                          }} 
+                          required 
+                          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none transition-all pr-12" 
+                        />
+                        <button type="button" onClick={() => setShowOldPassword(!showOldPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                          {showOldPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={handleVerifyPassword} 
+                        disabled={verifyingPassword || !passwords.old}
+                        className={`px-4 py-3 rounded-xl font-bold text-xs transition-colors shadow-sm shrink-0 ${isPasswordVerified ? 'bg-emerald-600 text-white' : 'bg-sky-600 hover:bg-sky-700 text-white disabled:opacity-50'}`}
+                      >
+                        {verifyingPassword ? 'Verifying...' : isPasswordVerified ? '✓ Verified' : 'Verify'}
                       </button>
                     </div>
                   </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">New Password</label>
+                    <div className="relative">
+                      <input 
+                        type={showNewPassword ? "text" : "password"} 
+                        name="new" 
+                        disabled={!isPasswordVerified}
+                        value={passwords.new} 
+                        onChange={handlePasswordChange} 
+                        required 
+                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none transition-all pr-12 disabled:opacity-50 disabled:cursor-not-allowed" 
+                        placeholder={!isPasswordVerified ? "Verify current password first" : "Min 8 chars, 1 upper, 1 lower, 1 num, 1 special"}
+                      />
+                      <button type="button" disabled={!isPasswordVerified} onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:opacity-50">
+                        {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Confirm Password</label>
-                    <input type="password" name="confirm" value={passwords.confirm} onChange={handlePasswordChange} required 
-                      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none transition-all" />
+                    <div className="relative">
+                      <input 
+                        type={showConfirmPassword ? "text" : "password"} 
+                        name="confirm" 
+                        disabled={!isPasswordVerified}
+                        value={passwords.confirm} 
+                        onChange={handlePasswordChange} 
+                        required 
+                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none transition-all pr-12 disabled:opacity-50 disabled:cursor-not-allowed" 
+                        placeholder={!isPasswordVerified ? "Verify current password first" : "Re-enter new password"}
+                      />
+                      <button type="button" disabled={!isPasswordVerified} onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:opacity-50">
+                        {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
                   </div>
-                  <button type="submit" disabled={loading}
-                    className="bg-black hover:bg-gray-900 text-white px-6 py-2.5 rounded-xl font-medium shadow-sm transition-colors mt-2">
-                    Save Password
+
+                  <button 
+                    type="submit" 
+                    disabled={loading || !isPasswordVerified}
+                    className="bg-black hover:bg-gray-900 text-white px-6 py-2.5 rounded-xl font-medium shadow-sm transition-colors mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? 'Saving...' : 'Save Password'}
                   </button>
                 </form>
               </section>
