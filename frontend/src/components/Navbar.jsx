@@ -102,10 +102,12 @@ const Navbar = () => {
       name: t('navbar.gallery') || 'Gallery',
       dropdown: [
         { name: 'All Photos', path: '/gallery' },
+        { name: 'Blessings', path: '/gallery?category=Blessings' },
         { name: 'Festivals', path: '/gallery?category=Festivals' },
         { name: 'Pooja', path: '/gallery?category=Pooja' },
         { name: 'Pravachan', path: '/gallery?category=Pravachan' },
         { name: 'Monastery', path: '/gallery?category=Monastery' },
+        { name: 'Maharaj', path: '/gallery?category=Maharaj' },
         { name: 'News', path: '/gallery?category=News' }
       ]
     },

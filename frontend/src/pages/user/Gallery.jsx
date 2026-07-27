@@ -172,21 +172,12 @@ const Gallery = () => {
       <section className="relative z-30 pt-8 pb-32 bg-[#FDFBF7]">
         <div className="max-w-7xl mx-auto px-4 md:px-8">
           
-          {/* Category Filter Pills (All 7 Categories + All) */}
-          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mb-10">
-            {GALLERY_CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`px-5 py-2 rounded-full text-xs sm:text-sm font-bold uppercase tracking-wider transition-all duration-300 ${
-                  activeCategory === cat
-                    ? "bg-[#4A0E0E] text-white shadow-lg scale-105"
-                    : "bg-white text-gray-700 hover:bg-orange-50 border border-stone-200"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
+          {/* Active Category Title Header */}
+          <div className="mb-10 text-center">
+            <h2 className="text-3xl md:text-4xl font-serif font-bold text-[#4A0E0E] tracking-tight">
+              {activeCategory === "All" ? "All Memories & Divine Archive" : activeCategory === "News" ? "News & Updates" : `${activeCategory} Gallery`}
+            </h2>
+            <div className="w-16 h-1 bg-gold mx-auto mt-3 rounded-full"></div>
           </div>
 
           {((activeCategory === "News" && loadingNews) || (activeCategory !== "News" && loading)) ? (

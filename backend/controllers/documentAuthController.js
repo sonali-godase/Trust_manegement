@@ -8,8 +8,8 @@ const sendEmail = require("../utils/sendEmail");
 const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require("../utils/cloudinaryHelper");
 
 
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || "default_secret_key", {
+const generateToken = (id, role = "DocumentHandler") => {
+  return jwt.sign({ id, role }, process.env.JWT_SECRET || "default_secret_key", {
     expiresIn: "30d"
   });
 };
@@ -21,12 +21,13 @@ exports.login = async (req, res) => {
     const admin = await DocumentAdmin.findOne({ email });
 
     if (admin && (await admin.matchPassword(password))) {
+      const role = admin.role || "DocumentHandler";
       res.json({
         success: true,
         _id: admin._id,
         email: admin.email,
-        role: admin.role,
-        token: generateToken(admin._id)
+        role: role,
+        token: generateToken(admin._id, role)
       });
     } else {
       res.status(401).json({ success: false, message: "Invalid email or password" });
@@ -236,7 +237,8 @@ exports.updateProfile = async (req, res) => {
     
     const response = admin.toObject();
     delete response.password;
-    res.status(200).json({ success: true, message: "Profile updated successfully", data: response });
+    response.role = admin.role || 'DocumentHandler';
+    res.status(200).json({ success: true, message: "Profile updated successfully", user: response, data: response });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

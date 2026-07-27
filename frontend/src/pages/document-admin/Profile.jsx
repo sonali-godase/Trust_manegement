@@ -6,8 +6,18 @@ import { FiUser, FiMail, FiPhone, FiMapPin, FiShield, FiSave, FiEdit2, FiCamera,
 import { Globe, Clock, Activity, ChevronDown } from 'lucide-react';
 import api from '../../utils/api';
 
+const Toggle = ({ enabled, onChange }) => (
+  <button
+    type="button"
+    onClick={onChange}
+    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enabled ? 'bg-sky-600' : 'bg-gray-200'}`}
+  >
+    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+  </button>
+);
+
 const DocumentAdminProfile = () => {
-  const { user, login } = useAuth();
+  const { user, setUser } = useAuth();
   const { i18n, t } = useTranslation();
   const [activeTab, setActiveTab] = useState('personal');
   const [isEditing, setIsEditing] = useState(false);
@@ -27,6 +37,77 @@ const DocumentAdminProfile = () => {
     contactNo: '',
     address: ''
   });
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user.name || '',
+        email: user.email || '',
+        contactNo: user.contactNo || user.mobile || user.phone || '',
+        address: user.address || ''
+      });
+      if (user.profilePhoto) {
+        const url = user.profilePhoto.startsWith('http') 
+          ? user.profilePhoto 
+          : `${API_URL}${user.profilePhoto.startsWith('/') ? '' : '/'}${user.profilePhoto}`;
+        setImagePreview(url);
+      }
+    }
+  }, [user]);
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setProfileImage(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleSavePersonalInfo = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setSuccessMsg('');
+    setErrorMsg('');
+    try {
+      const data = new FormData();
+      data.append('name', formData.name);
+      data.append('contactNo', formData.contactNo);
+      data.append('address', formData.address);
+      if (profileImage) {
+        data.append('profileImage', profileImage);
+      }
+
+      const res = await api.put('/document-admin/profile', data);
+      if (res.data.success) {
+        setSuccessMsg('Personal information updated successfully!');
+        setIsEditing(false);
+        const updatedUser = res.data.user || res.data.data;
+        if (setUser && updatedUser) {
+          const userWithRole = { ...user, ...updatedUser, role: updatedUser.role || user?.role || 'DocumentHandler' };
+          setUser(userWithRole);
+        }
+      } else {
+        setErrorMsg(res.data.message || 'Failed to update personal information.');
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMsg(err.response?.data?.message || 'Failed to update personal information.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const [preferences, setPreferences] = useState({
+    showActivities: true,
+    showBranches: true,
+    showDonations: true,
+    showEvents: true,
+    language: 'English'
+  });
+
+  const handleTogglePref = (key) => {
+    setPreferences(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const [securityData, setSecurityData] = useState({
     currentPassword: '',
@@ -226,7 +307,7 @@ const DocumentAdminProfile = () => {
             {activeTab === 'personal' && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}>
                 <h2 className="text-xl font-bold text-slate-900 mb-6 border-b border-gray-100 pb-4">Personal Information</h2>
-                <form onSubmit={handleUpdateProfile} className="space-y-6">
+                <form onSubmit={handleSavePersonalInfo} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">Full Name</label>

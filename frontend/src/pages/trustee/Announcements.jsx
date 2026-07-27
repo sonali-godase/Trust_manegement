@@ -372,8 +372,8 @@ const Announcements = () => {
               className="pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 w-full sm:w-64 shadow-sm transition-all"
             />
           </div>
-          <button onClick={handleOpenNew} className="flex items-center justify-center gap-2 px-5 md:px-6 py-2.5 md:py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl shadow-lg transition-all w-full sm:w-auto">
-            <FiPlus /> New Announcement
+          <button onClick={handleOpenNew} className="flex items-center justify-center gap-2 px-5 md:px-6 py-2.5 md:py-3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-700 text-white font-black rounded-xl shadow-md hover:shadow-xl transform hover:-translate-y-0.5 transition-all w-full sm:w-auto">
+            <FiPlus size={18} /> New Announcement
           </button>
         </div>
       </div>
@@ -412,11 +412,8 @@ const Announcements = () => {
             ) : (
               <div className="grid grid-cols-1 gap-4">
                 {paginatedData.map((ann, index) => {
-                  const isHighlighted = newlyAddedId ? ann._id === newlyAddedId : (index === 0 && new Date() - new Date(ann.createdAt) < 60000);
+                  const isRecent = newlyAddedId ? ann._id === newlyAddedId : (new Date() - new Date(ann.createdAt) < 86400000);
                   
-                  // Same background for all to keep a standard clean UI, only left stripe shows priority
-                  const priorityBg = 'bg-white border-slate-100';
-
                   const timeAgo = (date) => {
                     if (!date) return '';
                     const seconds = Math.floor((new Date() - new Date(date)) / 1000);
@@ -439,10 +436,10 @@ const Announcements = () => {
                   return (
                     <motion.div 
                       key={ann._id} 
-                      initial={isHighlighted ? { scale: 0.95, opacity: 0 } : {}}
-                      animate={isHighlighted ? { scale: 1, opacity: 1 } : {}}
+                      initial={isRecent ? { scale: 0.97, opacity: 0 } : {}}
+                      animate={isRecent ? { scale: 1, opacity: 1 } : {}}
                       transition={{ duration: 0.4 }}
-                      className={`rounded-xl border ${isHighlighted ? 'border-saffron-300 shadow-saffron-100 bg-saffron-50/50 ring-2 ring-saffron-400' : 'bg-white border-slate-200'} p-5 flex flex-col shadow-sm hover:shadow-md transition-all relative group`}
+                      className={`rounded-xl border ${isRecent ? 'border-l-4 border-l-orange-500 border-amber-300 bg-gradient-to-r from-amber-50/70 via-orange-50/20 to-white ring-2 ring-orange-400/50 shadow-md' : 'bg-white border-slate-200'} p-5 flex flex-col shadow-sm hover:shadow-md transition-all relative group`}
                     >
                       {/* Author Header */}
                       <div className="flex justify-between items-start mb-3">
@@ -455,9 +452,14 @@ const Announcements = () => {
                             )}
                           </div>
                           <div>
-                            <h4 className="text-sm font-bold text-slate-900 leading-tight">
+                            <h4 className="text-sm font-bold text-slate-900 leading-tight flex items-center gap-1.5">
                               {ann.createdBy?.name || 'System Admin'}
-                              {ann.createdBy?.role && <span className="text-slate-500 font-normal ml-1">• {ann.createdBy.role}</span>}
+                              {ann.createdBy?.role && <span className="text-slate-500 font-normal">• {ann.createdBy.role}</span>}
+                              {isRecent && (
+                                <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-widest rounded-full bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm animate-pulse ml-1.5 inline-flex items-center gap-1">
+                                  <FiBell size={9} /> NEW
+                                </span>
+                              )}
                             </h4>
                             <div className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-1.5">
                                <span>{timeAgo(ann.publishDate || ann.createdAt)}</span>
@@ -465,8 +467,6 @@ const Announcements = () => {
                                <span className="flex items-center gap-1"><FiUsers size={10} /> {ann.audienceType}</span>
                                • 
                                <span className={`px-1.5 py-0 text-[9px] font-bold uppercase rounded ${ann.priority === 'Urgent' ? 'bg-rose-100 text-rose-700' : ann.priority === 'Important' ? 'bg-amber-100 text-amber-700' : 'bg-blue-50 text-blue-600'}`}>{ann.priority}</span>
-                               
-                               {isHighlighted && <span className="px-1.5 py-0 text-[9px] font-black uppercase tracking-widest rounded bg-saffron-500 text-white shadow-sm animate-pulse ml-1">NEW</span>}
                             </div>
                           </div>
                         </div>
