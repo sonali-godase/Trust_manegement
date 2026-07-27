@@ -39,6 +39,7 @@ const Layout = ({ children, user }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notificationFilter, setNotificationFilter] = useState("unread");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [pendingCounts, setPendingCounts] = useState({
@@ -83,14 +84,14 @@ const Layout = ({ children, user }) => {
           console.error("Failed to fetch pending donations counts", error);
         }
       }
-    }; // Added missing closing brace
+    };
 
     const fetchNotifications = async () => {
       if (user) {
         try {
           const res = await api.get("/announcements/my-notifications");
           if (res.data?.success) {
-            setMyNotifications(res.data.data);
+            setMyNotifications(res.data.data || []);
           }
         } catch (error) {
           console.error("Failed to fetch notifications", error);
@@ -101,11 +102,10 @@ const Layout = ({ children, user }) => {
     fetchPendingCounts();
     fetchNotifications();
 
-    // Optional: Set up polling every minute to keep counts fresh
     const interval = setInterval(() => {
       fetchPendingCounts();
       fetchNotifications();
-    }, 60000);
+    }, 30000);
     return () => clearInterval(interval);
   }, [user]);
 
@@ -113,10 +113,10 @@ const Layout = ({ children, user }) => {
     try {
       await api.post(`/announcements/${id}/read`);
       setMyNotifications((prev) =>
-        prev.map((n) => (n._id === id ? { ...n, isRead: true } : n)),
+        prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
       );
     } catch (err) {
-      console.error(err);
+      console.error("Failed to mark as read", err);
     }
   };
 
@@ -125,14 +125,26 @@ const Layout = ({ children, user }) => {
       await api.post(`/announcements/${id}/dismiss`);
       setMyNotifications((prev) => prev.filter((n) => n._id !== id));
     } catch (err) {
-      console.error(err);
+      console.error("Failed to dismiss notification", err);
     }
   };
 
+  const handleNotificationClick = async (ann) => {
+    await handleMarkAsRead(ann._id);
+    setShowNotifications(false);
+
+    let path = "/admin/announcements";
+    if (user?.role === "Trustee") path = "/trustee/announcements";
+    else if (user?.role === "BranchManager") path = "/branch/announcements";
+    else if (user?.role === "Accountant") path = "/accountant/announcements";
+    else if (user?.role === "DocumentHandler" || user?.role === "document_admin") path = "/document-handler/announcements";
+    else if (user?.role === "Devotee") path = "/devotee/dashboard";
+
+    navigate(path);
+  };
+
   // Calculate unread notifications count
-  const unreadAnnouncementsCount = myNotifications.filter(
-    (n) => !n.isRead,
-  ).length;
+  const unreadAnnouncementsCount = myNotifications.filter((n) => !n.isRead).length;
 
   const handleLogout = async () => {
     try {
@@ -562,84 +574,110 @@ const Layout = ({ children, user }) => {
                   transition={{ type: "spring", damping: 25, stiffness: 200 }}
                   className="fixed top-0 right-0 h-full w-96 max-w-full bg-white shadow-2xl z-[70] flex flex-col border-l border-gray-100"
                 >
-                  <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50">
-                    <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
-                      <FaBell className="text-[#FF7A2F]" /> Notifications
-                    </h3>
-                    <button
-                      onClick={() => setShowNotifications(false)}
-                      className="text-gray-400 hover:text-gray-900 font-bold"
-                    >
-                      ✕
-                    </button>
+                  <div className="p-5 border-b border-gray-100 bg-gray-50 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
+                        <FaBell className="text-[#FF7A2F]" /> Notifications
+                      </h3>
+                      <button
+                        onClick={() => setShowNotifications(false)}
+                        className="text-gray-400 hover:text-gray-900 font-bold p-1 rounded-lg hover:bg-gray-200 transition-colors"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {/* Tabs: Unread vs All */}
+                    <div className="flex gap-2 bg-gray-200/60 p-1 rounded-xl text-xs font-bold">
+                      <button
+                        onClick={() => setNotificationFilter("unread")}
+                        className={`flex-1 py-1.5 rounded-lg transition-all ${notificationFilter === "unread" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                      >
+                        New / Unread ({unreadAnnouncementsCount})
+                      </button>
+                      <button
+                        onClick={() => setNotificationFilter("all")}
+                        className={`flex-1 py-1.5 rounded-lg transition-all ${notificationFilter === "all" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                      >
+                        All ({myNotifications.length})
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                    {myNotifications.length === 0 ? (
-                      <div className="text-center py-10 text-gray-400">
-                        <FaBell className="mx-auto text-3xl mb-2 opacity-30" />
-                        <p className="text-sm font-bold">
-                          No new notifications
-                        </p>
-                      </div>
-                    ) : (
-                      myNotifications.map((ann) => (
+
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                    {(() => {
+                      const displayed = notificationFilter === "unread" 
+                        ? myNotifications.filter(n => !n.isRead) 
+                        : myNotifications;
+
+                      if (displayed.length === 0) {
+                        return (
+                          <div className="text-center py-16 text-gray-400">
+                            <FaBell className="mx-auto text-4xl mb-3 opacity-30 text-[#FF7A2F]" />
+                            <p className="text-sm font-bold text-gray-600">
+                              {notificationFilter === "unread" ? "No unread notifications" : "No notifications available"}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              You're all caught up!
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      return displayed.map((ann) => (
                         <div
                           key={ann._id}
-                          className={`p-4 rounded-2xl border transition-colors relative overflow-hidden group ${ann.isRead ? "bg-gray-50 border-gray-100 opacity-70" : "bg-blue-50/50 border-blue-100 hover:bg-blue-50"}`}
+                          className={`p-4 rounded-2xl border transition-all relative group shadow-sm ${!ann.isRead ? "bg-blue-50/60 border-blue-200 hover:border-blue-300" : "bg-gray-50/70 border-gray-100 opacity-80"}`}
                         >
-                          {!ann.isRead && (
-                            <div className="absolute top-0 right-0 w-2 h-2 bg-blue-500 rounded-full m-3"></div>
-                          )}
-
+                          {/* Close/Delete from view button (X) */}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDismiss(ann._id);
                             }}
-                            className="absolute top-3 right-3 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 bg-white rounded-full shadow-sm z-10"
-                            title="Dismiss"
+                            className="absolute top-3 right-3 text-gray-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-full transition-all z-20 cursor-pointer shadow-xs border border-transparent hover:border-red-200"
+                            title="Delete from view"
                           >
-                            <FaTimes size={10} />
+                            <FaTimes size={11} />
                           </button>
 
                           <div
                             className="cursor-pointer pr-6"
-                            onClick={() => {
-                              handleDismiss(ann._id);
-                              setShowNotifications(false);
-                              let basePath = user.role.toLowerCase();
-                              if (user.role === "BranchManager")
-                                basePath = "branch";
-                              else if (
-                                user.role === "DocumentHandler" ||
-                                user.role === "document_admin"
-                              )
-                                basePath = "document-handler";
-                              navigate(`/${basePath}/announcements`);
-                            }}
+                            onClick={() => handleNotificationClick(ann)}
                           >
-                            <div className="flex items-center gap-3 mb-2">
-                              <div
-                                className={`w-8 h-8 rounded-full flex items-center justify-center ${ann.priority === "Urgent" ? "bg-red-100 text-red-500" : ann.priority === "Important" ? "bg-yellow-100 text-yellow-500" : "bg-blue-100 text-blue-500"}`}
-                              >
-                                <FaBullhorn />
-                              </div>
-                              <h4 className="text-sm font-bold text-gray-900 pr-4 truncate">
-                                {ann.title}
-                              </h4>
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              {!ann.isRead && (
+                                <span className="flex items-center gap-1.5 px-2 py-0.5 bg-red-500 text-white text-[10px] font-black rounded-md tracking-wider uppercase shadow-xs">
+                                  <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping"></span>
+                                  NEW
+                                </span>
+                              )}
+                              <span className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider ${ann.priority === "Urgent" || ann.priority === "High" ? "bg-red-100 text-red-700" : ann.priority === "Important" || ann.priority === "Medium" ? "bg-amber-100 text-amber-800" : "bg-blue-100 text-blue-700"}`}>
+                                {ann.priority || "Announcement"}
+                              </span>
+                              <span className="text-[10px] text-gray-400 font-semibold ml-auto">
+                                {new Date(ann.publishDate || ann.createdAt).toLocaleDateString()}
+                              </span>
                             </div>
-                            <p className="text-xs text-gray-600 pl-11 line-clamp-2">
+
+                            <h4 className="text-sm font-bold text-gray-900 mb-1.5 leading-snug">
+                              {ann.title}
+                            </h4>
+
+                            <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-line font-light">
                               {ann.message}
                             </p>
-                            <p className="text-[10px] text-gray-400 font-bold tracking-wider pl-11 mt-2 uppercase">
-                              {new Date(
-                                ann.publishDate || ann.createdAt,
-                              ).toLocaleDateString()}
-                            </p>
+
+                            {ann.createdByPanel && (
+                              <p className="text-[10px] text-gray-400 font-semibold mt-2.5 pt-2 border-t border-gray-100/60 flex items-center justify-between">
+                                <span>From: {ann.createdByPanel}</span>
+                                <span className="text-xs text-[#FF7A2F] font-bold group-hover:underline">Read →</span>
+                              </p>
+                            )}
                           </div>
                         </div>
-                      ))
-                    )}
+                      ));
+                    })()}
                   </div>
                 </motion.div>
               </>

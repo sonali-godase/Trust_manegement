@@ -300,11 +300,9 @@ exports.getMyNotifications = async (req, res) => {
     const user = req.user;
     if (!user) return res.status(401).json({ success: false, message: "Unauthorized" });
 
-    const conditions = [{ audienceType: 'All Users' }];
+    let conditions = [{ audienceType: 'All Users' }];
 
-    if (user.role === 'Admin') {
-      conditions.push({ targetRoles: 'Admin' });
-    } else if (user.role === 'Devotee') {
+    if (user.role === 'Devotee') {
       conditions.push({ audienceType: 'All Devotees' });
     } else if (user.role === 'Trustee') {
       conditions.push({ audienceType: 'All Trust Members' });
@@ -314,8 +312,9 @@ exports.getMyNotifications = async (req, res) => {
     } else if (user.role === 'BranchManager') {
       conditions.push({ audienceType: 'All Branches' });
       conditions.push({ targetRoles: 'BranchManager' });
-      if (user.branchId) {
-        conditions.push({ targetBranches: user.branchId });
+      const bId = user.branchId || user.branch?._id || user.branch;
+      if (bId) {
+        conditions.push({ targetBranches: bId });
       }
     } else if (user.role === 'Accountant') {
       conditions.push({ targetRoles: 'Accountant' });
@@ -326,11 +325,12 @@ exports.getMyNotifications = async (req, res) => {
     // Specific user targeting applies to anyone
     conditions.push({ targetUsers: user._id });
 
+    const query = user.role === 'Admin' 
+      ? { status: 'Published' } 
+      : { status: 'Published', $or: conditions };
+
     // Find announcements matching the conditions
-    const announcements = await Announcement.find({
-      status: 'Published',
-      $or: conditions
-    }).sort({ publishDate: -1 });
+    const announcements = await Announcement.find(query).sort({ publishDate: -1, createdAt: -1 });
 
     // Fetch read status for these announcements
     const announcementIds = announcements.map(a => a._id);
