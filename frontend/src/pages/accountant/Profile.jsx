@@ -6,7 +6,7 @@ import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 
 const Profile = () => {
-  const { user, login } = useAuth();
+  const { user, login, setUser } = useAuth();
   const { i18n } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({

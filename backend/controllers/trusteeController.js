@@ -212,8 +212,8 @@ exports.updateProfile = async (req, res) => {
       trustee.password = targetNewPassword;
     }
 
-    if (name) trustee.name = name;
-    if (mobile) trustee.mobile = mobile;
+    if (name !== undefined) trustee.name = name;
+    if (mobile !== undefined) trustee.mobile = mobile;
     const file = req.file || (req.files && (req.files.profilePhoto?.[0] || req.files.profileImage?.[0]));
     if (file) {
       const oldPublicId = trustee.profilePhotoPublicId || extractPublicId(trustee.profilePhoto);
