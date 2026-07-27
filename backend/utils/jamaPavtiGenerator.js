@@ -44,7 +44,13 @@ exports.drawJamaPavti = (ctx) => {
   doc.roundedRect(boxX, yOffset + 85, boxWidth, 24, 12).fill(pinkRed);
   doc.fillColor('white');
   setBoldFont(12);
-  doc.text("जमा पावती", boxX, yOffset + 89, { width: boxWidth, align: 'center' });
+  let pavtiTitle = "देणगी पावती";
+  if (donation.donationType === "jama_pavti") pavtiTitle = "जमा पावती";
+  else if (donation.donationType === "shakha_pavti") pavtiTitle = "शाखा पावती";
+  else if (donation.category?.toLowerCase().includes("jama")) pavtiTitle = "जमा पावती";
+  else if (donation.category?.toLowerCase().includes("shakha") || donation.category?.toLowerCase().includes("branch")) pavtiTitle = "शाखा पावती";
+
+  doc.text(pavtiTitle, boxX, yOffset + 89, { width: boxWidth, align: 'center' });
   
   // Copy Title below
   if (copyTitle) {

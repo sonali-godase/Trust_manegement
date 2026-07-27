@@ -261,10 +261,7 @@ exports.generateReceiptPdf = (rawDonation) => {
       const drawReceiptTemplate = (yOffset, copyTitle) => {
         ctx.yOffset = yOffset;
         ctx.copyTitle = copyTitle;
-
-        if (donation.donationType === "jama_pavti") {
-          drawJamaPavti(ctx);
-        }
+        drawJamaPavti(ctx);
       };
 
       if (isJamaPavti) {
