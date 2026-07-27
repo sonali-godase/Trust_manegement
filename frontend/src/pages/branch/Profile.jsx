@@ -14,12 +14,92 @@ const Profile = () => {
   
   const [activeTab, setActiveTab] = useState('personal');
   
+  const [message, setMessage] = useState({ type: '', text: '' });
+  const [loading, setLoading] = useState(false);
+  const [preferences, setPreferences] = useState({
+    language: 'English',
+    showActivities: true, showBranches: true, showDonations: true, showEvents: true
+  });
+  
   const [personalInfo, setPersonalInfo] = useState({
     name: '', email: '', mobile: '', managerId: '', joiningDate: '', address: '', profilePhoto: ''
   });
   const [profileImageFile, setProfileImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+  useEffect(() => {
+    if (user) {
+      setPersonalInfo({
+        name: user.name || user.fullName || '',
+        email: user.email || '',
+        mobile: user.mobile || user.phone || '',
+        managerId: user.managerId || user._id || 'BM-MAIN',
+        joiningDate: user.joiningDate ? new Date(user.joiningDate).toISOString().split('T')[0] : '2024-01-01',
+        address: user.address || '',
+        profilePhoto: user.profilePhoto || ''
+      });
+      if (user.profilePhoto) {
+        const photoUrl = user.profilePhoto.startsWith('http') 
+          ? user.profilePhoto 
+          : `${API_URL.replace(/\/api$/, '')}${user.profilePhoto.startsWith('/') ? '' : '/'}${user.profilePhoto}`;
+        setImagePreview(photoUrl);
+      }
+    }
+  }, [user]);
+
+  const handlePersonalChange = (e) => {
+    setPersonalInfo({ ...personalInfo, [e.target.name]: e.target.value });
+  };
+
+  const handlePasswordChange = (e) => {
+    setPasswords({ ...passwords, [e.target.name]: e.target.value });
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setProfileImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleSavePersonalInfo = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const data = new FormData();
+      data.append('name', personalInfo.name);
+      data.append('mobile', personalInfo.mobile);
+      data.append('address', personalInfo.address);
+      if (profileImageFile) {
+        data.append('profileImage', profileImageFile);
+      }
+      const res = await api.put('/branch-managers/profile', data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (res.data.success) {
+        login(sessionStorage.getItem('token') || localStorage.getItem('token'), res.data.data);
+        setMessage({ type: 'success', text: 'Personal information updated successfully.' });
+      } else {
+        setMessage({ type: 'error', text: res.data.message || 'Failed to update personal info.' });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Failed to update profile.' });
+    } finally {
+      setLoading(false);
+      setTimeout(() => setMessage({ type: '', text: '' }), 5000);
+    }
+  };
+
+  const handleTogglePref = (key) => {
+    setPreferences(prev => {
+      const updated = { ...prev, [key]: !prev[key] };
+      localStorage.setItem('adminPreferences', JSON.stringify(updated));
+      window.dispatchEvent(new Event('preferencesUpdated'));
+      return updated;
+    });
+  };
   
   // Tab 2: Security Settings
   const [passwords, setPasswords] = useState({ old: '', new: '', confirm: '' });

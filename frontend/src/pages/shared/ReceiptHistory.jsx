@@ -19,6 +19,7 @@ const ReceiptHistory = ({ defaultCategory = 'All', hideTitle = false, hideCatego
   const [viewReceiptModal, setViewReceiptModal] = useState(null);
   const [pdfBlobUrl, setPdfBlobUrl] = useState('');
   const [loadingPdfBlob, setLoadingPdfBlob] = useState(false);
+  const [pdfError, setPdfError] = useState(false);
   const { user } = useAuth();
 
   const [showFilters, setShowFilters] = useState(false);
@@ -72,8 +73,6 @@ const ReceiptHistory = ({ defaultCategory = 'All', hideTitle = false, hideCatego
     fetchReceipts();
   };
 
-  const [previewMode, setPreviewMode] = useState('pdf'); // 'pdf' or 'html'
-
   const getPdfUrl = (receipt) => {
     if (!receipt) return '';
     if (receipt.pdfUrl && (receipt.pdfUrl.startsWith('http://') || receipt.pdfUrl.startsWith('https://'))) {
@@ -92,24 +91,28 @@ const ReceiptHistory = ({ defaultCategory = 'All', hideTitle = false, hideCatego
   };
 
   const getReceiptPdfBlob = async (receipt) => {
-    const targetId = receipt.donationId || receipt._id;
-    try {
-      const response = await api.get(`/donations/${targetId}/receipt`, { responseType: 'blob', timeout: 15000 });
-      if (response.data.type === 'text/html' || (typeof response.data.type === 'string' && response.data.type.includes('html'))) {
-        throw new Error("Invalid response format: Received HTML page instead of PDF document.");
-      }
-      return new Blob([response.data], { type: 'application/pdf' });
-    } catch (err) {
-      console.warn("Backend receipt API fetch encountered error, attempting direct stored URL fetch...", err.message);
-      if (receipt.pdfUrl && (receipt.pdfUrl.startsWith('http://') || receipt.pdfUrl.startsWith('https://'))) {
+    // Fast-path: If Cloudinary URL is directly stored on receipt, try fetching it directly
+    if (receipt.pdfUrl && (receipt.pdfUrl.startsWith('http://') || receipt.pdfUrl.startsWith('https://'))) {
+      try {
         const cloudRes = await fetch(receipt.pdfUrl);
         if (cloudRes.ok) {
           const blob = await cloudRes.blob();
-          return new Blob([blob], { type: 'application/pdf' });
+          if (blob.size > 0 && (blob.type === 'application/pdf' || blob.type === '')) {
+            return new Blob([blob], { type: 'application/pdf' });
+          }
         }
+      } catch (e) {
+        console.warn("Direct Cloudinary URL fetch skipped, using API endpoint:", e.message);
       }
-      throw err;
     }
+
+    // Secondary path: Call authenticated backend API endpoint with 30s timeout
+    const targetId = receipt.donationId || receipt._id;
+    const response = await api.get(`/donations/${targetId}/receipt`, { responseType: 'blob', timeout: 30000 });
+    if (response.data.type === 'text/html' || (typeof response.data.type === 'string' && response.data.type.includes('html'))) {
+      throw new Error("Invalid response format: Received HTML page instead of PDF document.");
+    }
+    return new Blob([response.data], { type: 'application/pdf' });
   };
 
   const handleView = async (receipt) => {
@@ -118,6 +121,7 @@ const ReceiptHistory = ({ defaultCategory = 'All', hideTitle = false, hideCatego
       window.URL.revokeObjectURL(pdfBlobUrl);
     }
     setPdfBlobUrl('');
+    setPdfError(false);
     setLoadingPdfBlob(true);
     try {
       const blob = await getReceiptPdfBlob(receipt);
@@ -125,6 +129,7 @@ const ReceiptHistory = ({ defaultCategory = 'All', hideTitle = false, hideCatego
       setPdfBlobUrl(objUrl);
     } catch (err) {
       console.error("Failed to load PDF preview:", err);
+      setPdfError(true);
       toast.error("Failed to load receipt PDF preview.");
     } finally {
       setLoadingPdfBlob(false);
@@ -388,9 +393,34 @@ const ReceiptHistory = ({ defaultCategory = 'All', hideTitle = false, hideCatego
 
             <div className="p-3 sm:p-6 overflow-y-auto flex justify-center items-center bg-gray-100/50 min-h-[550px]">
               {loadingPdfBlob ? (
-                <div className="flex flex-col items-center justify-center h-[580px] w-full bg-white rounded-xl">
-                  <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-2" />
-                  <p className="text-sm font-semibold text-gray-600">Generating receipt PDF preview...</p>
+                <div className="flex flex-col items-center justify-center h-[580px] w-full bg-white rounded-xl shadow-sm border border-gray-100">
+                  <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-3" />
+                  <p className="text-sm font-bold text-gray-700">Connecting to server & loading PDF receipt...</p>
+                  <p className="text-xs text-gray-400 mt-1">Please wait a moment while the PDF is fetched.</p>
+                </div>
+              ) : pdfError ? (
+                <div className="flex flex-col items-center justify-center h-[580px] w-full bg-white rounded-xl shadow-sm border border-red-100 p-6 text-center">
+                  <div className="w-14 h-14 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-4">
+                    <X size={28} />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">Receipt PDF Unavailable</h3>
+                  <p className="text-xs text-gray-500 max-w-md mb-6">
+                    The backend server on Render may be waking up or experiencing temporary connection latency. You can retry loading or download the PDF directly.
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-3">
+                    <button
+                      onClick={() => handleView(viewReceiptModal)}
+                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
+                    >
+                      Retry Loading PDF
+                    </button>
+                    <button
+                      onClick={() => handleDownload(viewReceiptModal)}
+                      className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
+                    >
+                      Download PDF Document
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <iframe

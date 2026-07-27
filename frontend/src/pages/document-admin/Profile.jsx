@@ -21,12 +21,104 @@ const DocumentAdminProfile = () => {
   
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+  const [preferences, setPreferences] = useState({
+    language: 'English',
+    showActivities: true, showBranches: true, showDonations: true, showEvents: true
+  });
+
+  useEffect(() => {
+    const savedPrefs = localStorage.getItem('adminPreferences');
+    if (savedPrefs) {
+      try {
+        setPreferences(prev => ({ ...prev, ...JSON.parse(savedPrefs) }));
+      } catch (e) {
+        console.error("Failed to parse preferences", e);
+      }
+    }
+  }, []);
+
+  const handleTogglePref = (key) => {
+    setPreferences(prev => {
+      const updated = { ...prev, [key]: !prev[key] };
+      localStorage.setItem('adminPreferences', JSON.stringify(updated));
+      window.dispatchEvent(new Event('preferencesUpdated'));
+      return updated;
+    });
+  };
+
+  const Toggle = ({ enabled, onChange }) => (
+    <div 
+      onClick={onChange}
+      className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ${enabled ? 'bg-sky-500' : 'bg-gray-300'}`}
+    >
+      <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${enabled ? 'translate-x-6' : ''}`} />
+    </div>
+  );
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     contactNo: '',
     address: ''
   });
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user.name || user.fullName || '',
+        email: user.email || '',
+        contactNo: user.contactNo || user.mobile || user.phone || '',
+        address: user.address || ''
+      });
+      if (user.profilePhoto) {
+        const photoUrl = user.profilePhoto.startsWith('http') 
+          ? user.profilePhoto 
+          : `${API_URL.replace(/\/api$/, '')}${user.profilePhoto.startsWith('/') ? '' : '/'}${user.profilePhoto}`;
+        setImagePreview(photoUrl);
+      }
+    }
+  }, [user]);
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setProfileImage(file);
+      setImagePreview(URL.createObjectURL(file));
+      setIsEditing(true);
+    }
+  };
+
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setSuccessMsg('');
+    setErrorMsg('');
+    try {
+      const data = new FormData();
+      data.append('name', formData.name);
+      data.append('contactNo', formData.contactNo);
+      data.append('address', formData.address);
+      if (profileImage) {
+        data.append('profileImage', profileImage);
+      }
+
+      const res = await api.put('/document-admin/profile', data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (res.data.success) {
+        login(sessionStorage.getItem('token') || localStorage.getItem('token') || sessionStorage.getItem('documentAdminToken') || localStorage.getItem('documentAdminToken'), res.data.data);
+        setSuccessMsg('Profile information updated successfully!');
+        setIsEditing(false);
+      } else {
+        setErrorMsg(res.data.message || 'Failed to update profile.');
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMsg(err.response?.data?.message || 'Failed to update profile.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [securityData, setSecurityData] = useState({
     currentPassword: '',
