@@ -30,21 +30,24 @@ let _transporter = null;
 const getTransporter = () => {
   if (_transporter) return _transporter;
 
+  const isPort465 = process.env.EMAIL_PORT === "465";
   _transporter = nodemailer.createTransport({
-    pool:   true,
-    maxConnections: 5,
-    maxMessages: 100,
+    service: process.env.EMAIL_SERVICE || "gmail",
     host:   process.env.EMAIL_HOST || "smtp.gmail.com",
     port:   parseInt(process.env.EMAIL_PORT, 10) || 587,
-    secure: process.env.EMAIL_SECURE === "true", // true → port 465, false → STARTTLS
+    secure: process.env.EMAIL_SECURE === "true" || isPort465, // true for 465, false for 587
+    requireTLS: !isPort465,
     auth: {
-      user: emailUser,
-      pass: emailPass,
+      user: process.env.EMAIL_USER,
+      pass: emailPass ? emailPass.replace(/\s+/g, '') : '',
     },
-    // Prevent the connection from hanging indefinitely
-    connectionTimeout: 10_000,
-    greetingTimeout:   10_000,
+    // Connection timeouts to prevent hanging sockets
+    connectionTimeout: 15_000,
+    greetingTimeout:   15_000,
     socketTimeout:     15_000,
+    tls: {
+      rejectUnauthorized: false
+    }
   });
 
   return _transporter;

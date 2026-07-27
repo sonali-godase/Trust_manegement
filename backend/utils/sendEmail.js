@@ -5,15 +5,20 @@ const sendEmail = async (options) => {
     console.log("EMAIL_USER =", process.env.EMAIL_USER);
     console.log("EMAIL_PASS =", process.env.EMAIL_PASS ? "Loaded" : "Missing");
     console.log("EMAIL_SERVICE =", process.env.EMAIL_SERVICE);
+    const isPort465 = process.env.EMAIL_PORT === "465";
     const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 465,
-      secure: true, // true for 465, false for other ports
+      service: process.env.EMAIL_SERVICE || "gmail",
+      host: process.env.EMAIL_HOST || "smtp.gmail.com",
+      port: process.env.EMAIL_PORT ? parseInt(process.env.EMAIL_PORT) : 587,
+      secure: isPort465, // true for 465, false for 587
+      requireTLS: !isPort465,
       auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        pass: process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s+/g, '') : '',
       },
-      // Force IPv4 to prevent ENETUNREACH on IPv6-deprived networks
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 15000,
       tls: {
         rejectUnauthorized: false
       }
