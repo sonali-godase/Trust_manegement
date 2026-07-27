@@ -22,7 +22,7 @@ exports.createGalleryItem = async (req, res) => {
       const isVideo = type === "video" || req.file.mimetype.startsWith("video/");
       const folder = isVideo ? "gallery/videos" : "gallery/images";
       const resourceType = isVideo ? "video" : "image";
-      const uploadRes = await uploadToCloudinary(req.file.path, folder, { resourceType });
+      const uploadRes = await uploadToCloudinary(req.file, folder, { resourceType });
       if (uploadRes) {
         url = uploadRes.url;
         publicId = uploadRes.publicId;
@@ -62,7 +62,7 @@ exports.updateGalleryItem = async (req, res) => {
       const isVideo = type === "video" || req.file.mimetype.startsWith("video/");
       const folder = isVideo ? "gallery/videos" : "gallery/images";
       const resourceType = isVideo ? "video" : "image";
-      const uploadRes = await uploadToCloudinary(req.file.path, folder, { resourceType });
+      const uploadRes = await uploadToCloudinary(req.file, folder, { resourceType });
       if (uploadRes) {
         url = uploadRes.url;
         publicId = uploadRes.publicId;

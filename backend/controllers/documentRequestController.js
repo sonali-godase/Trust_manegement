@@ -12,20 +12,22 @@ exports.createDocumentRequest = async (req, res) => {
   try {
     const { requestType, targetDocumentId, title, description, category, branchId, deletionReason } = req.body;
     
+    const safeUnlink = (f) => { if (f && f.path && fs.existsSync(f.path)) { try { fs.unlinkSync(f.path); } catch(e){} } };
+
     if (!["Create", "Update", "Delete"].includes(requestType)) {
-      if (req.file) fs.unlinkSync(req.file.path);
+      safeUnlink(req.file);
       return res.status(400).json({ success: false, message: "Invalid request type" });
     }
 
     let targetDoc = null;
     if (["Update", "Delete"].includes(requestType)) {
       if (!targetDocumentId) {
-        if (req.file) fs.unlinkSync(req.file.path);
+        safeUnlink(req.file);
         return res.status(400).json({ success: false, message: "Target document ID is required for update or delete requests" });
       }
       targetDoc = await Document.findById(targetDocumentId);
       if (!targetDoc) {
-        if (req.file) fs.unlinkSync(req.file.path);
+        safeUnlink(req.file);
         return res.status(404).json({ success: false, message: "Target document not found" });
       }
     }
@@ -33,7 +35,7 @@ exports.createDocumentRequest = async (req, res) => {
     let documentData = {};
     let uploadRes = null;
     if (req.file) {
-      uploadRes = await uploadToCloudinary(req.file.path, "documents", { resourceType: "auto" });
+      uploadRes = await uploadToCloudinary(req.file, "documents", { resourceType: "auto" });
       if (!uploadRes) {
         return res.status(500).json({ success: false, message: "Failed to upload file to Cloudinary" });
       }

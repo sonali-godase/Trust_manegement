@@ -92,7 +92,7 @@ exports.createDonation = async (req, res) => {
     let screenshotUrl = null;
     let cloudinaryPublicId = null;
     if (req.file) {
-      const uploadRes = await uploadToCloudinary(req.file.path, "donations", { resourceType: "image" });
+      const uploadRes = await uploadToCloudinary(req.file, "donations", { resourceType: "image" });
       if (uploadRes) {
         screenshotUrl = uploadRes.url;
         cloudinaryPublicId = uploadRes.publicId;
@@ -236,7 +236,7 @@ exports.submitPayment = async (req, res) => {
       if (oldPublicId) {
         await deleteFromCloudinary(oldPublicId);
       }
-      const uploadRes = await uploadToCloudinary(req.file.path, "donations", { resourceType: "image" });
+      const uploadRes = await uploadToCloudinary(req.file, "donations", { resourceType: "image" });
       if (uploadRes) {
         screenshotUrl = uploadRes.url;
         cloudinaryPublicId = uploadRes.publicId;

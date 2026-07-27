@@ -37,7 +37,7 @@ exports.createMember = async (req, res) => {
 
     if (req.files) {
       if (req.files.profileImage) {
-        const uploadRes = await uploadToCloudinary(req.files.profileImage[0].path, "lineage", { resourceType: "image" });
+        const uploadRes = await uploadToCloudinary(req.files.profileImage[0], "lineage", { resourceType: "image" });
         if (uploadRes) {
           newMemberData.profileImage = uploadRes.url;
           newMemberData.profileImagePublicId = uploadRes.publicId;
@@ -47,7 +47,7 @@ exports.createMember = async (req, res) => {
         const urls = [];
         const pids = [];
         for (const f of req.files.galleryImages) {
-          const uploadRes = await uploadToCloudinary(f.path, "lineage", { resourceType: "image" });
+          const uploadRes = await uploadToCloudinary(f, "lineage", { resourceType: "image" });
           if (uploadRes) {
             urls.push(uploadRes.url);
             pids.push(uploadRes.publicId);
@@ -60,7 +60,7 @@ exports.createMember = async (req, res) => {
         const urls = [];
         const pids = [];
         for (const f of req.files.documents) {
-          const uploadRes = await uploadToCloudinary(f.path, "lineage/documents", { resourceType: "auto" });
+          const uploadRes = await uploadToCloudinary(f, "lineage/documents", { resourceType: "auto" });
           if (uploadRes) {
             urls.push(uploadRes.url);
             pids.push(uploadRes.publicId);
@@ -97,7 +97,7 @@ exports.updateMember = async (req, res) => {
         const oldPid = existingMember.profileImagePublicId || extractPublicId(existingMember.profileImage);
         if (oldPid) await deleteFromCloudinary(oldPid, "image");
 
-        const uploadRes = await uploadToCloudinary(req.files.profileImage[0].path, "lineage", { resourceType: "image" });
+        const uploadRes = await uploadToCloudinary(req.files.profileImage[0], "lineage", { resourceType: "image" });
         if (uploadRes) {
           updateData.profileImage = uploadRes.url;
           updateData.profileImagePublicId = uploadRes.publicId;
@@ -112,7 +112,7 @@ exports.updateMember = async (req, res) => {
         const urls = [];
         const pids = [];
         for (const f of req.files.galleryImages) {
-          const uploadRes = await uploadToCloudinary(f.path, "lineage", { resourceType: "image" });
+          const uploadRes = await uploadToCloudinary(f, "lineage", { resourceType: "image" });
           if (uploadRes) {
             urls.push(uploadRes.url);
             pids.push(uploadRes.publicId);
@@ -130,7 +130,7 @@ exports.updateMember = async (req, res) => {
         const urls = [];
         const pids = [];
         for (const f of req.files.documents) {
-          const uploadRes = await uploadToCloudinary(f.path, "lineage/documents", { resourceType: "auto" });
+          const uploadRes = await uploadToCloudinary(f, "lineage/documents", { resourceType: "auto" });
           if (uploadRes) {
             urls.push(uploadRes.url);
             pids.push(uploadRes.publicId);

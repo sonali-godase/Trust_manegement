@@ -30,7 +30,6 @@ const ManageNews = () => {
   const [editId, setEditId] = useState(null);
   
   // Filters
-  const [filterCategory, setFilterCategory] = useState("");
   const [filterBranch, setFilterBranch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
@@ -85,10 +84,9 @@ const ManageNews = () => {
   // Custom filter logic
   const filteredByCustom = items.filter(i => {
     let match = true;
-    if (filterCategory && i.category !== filterCategory) match = false;
     if (user?.role !== 'BranchManager') {
       if (filterBranch) {
-        if (filterBranch === 'All') {
+        if (filterBranch === 'Global' || filterBranch === 'All') {
           if (i.branchSelection !== 'All Branches') match = false;
         } else {
           if (i.branch?._id !== filterBranch && i.branch !== filterBranch) match = false;
@@ -346,27 +344,20 @@ const ManageNews = () => {
 
       {showFilters && (
         <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm mb-10">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Category</label>
-              <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-saffron-500">
-                <option value="">All Categories</option>
-                {categories.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {user?.role !== 'BranchManager' && (
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Branch</label>
-                <select value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-saffron-500">
-                  <option value="">All Branches / Global</option>
-                  <option value="All">All Branches (Global only)</option>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Filter by Branch</label>
+                <select value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-saffron-500 font-medium">
+                  <option value="">All News (Global & All Branches)</option>
+                  <option value="Global">Global News Only</option>
                   {branches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
                 </select>
               </div>
             )}
           </div>
           <div className="flex justify-end mt-4">
-            <button onClick={() => { setFilterCategory(''); setFilterBranch(''); }} className="text-sm font-bold text-gray-500 hover:text-gray-700">Clear Filters</button>
+            <button onClick={() => setFilterBranch('')} className="text-sm font-bold text-gray-500 hover:text-gray-700">Clear Filter</button>
           </div>
         </div>
       )}

@@ -11,7 +11,7 @@ exports.createDocument = async (req, res) => {
 
     const { title, description, category } = req.body;
     
-    const uploadRes = await uploadToCloudinary(req.file.path, "documents", { resourceType: "auto" });
+    const uploadRes = await uploadToCloudinary(req.file, "documents", { resourceType: "auto" });
     if (!uploadRes) {
       return res.status(500).json({ success: false, message: "Failed to upload document to Cloudinary" });
     }
@@ -32,7 +32,7 @@ exports.createDocument = async (req, res) => {
     res.status(201).json({ success: true, document });
   } catch (error) {
     // If error occurs, remove the uploaded file to prevent orphans
-    if (req.file) {
+    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
     res.status(500).json({ success: false, message: error.message });
@@ -117,7 +117,7 @@ exports.updateDocument = async (req, res) => {
         await deleteFromCloudinary(oldPublicId, "image");
       }
 
-      const uploadRes = await uploadToCloudinary(req.file.path, "documents", { resourceType: "auto" });
+      const uploadRes = await uploadToCloudinary(req.file, "documents", { resourceType: "auto" });
       if (uploadRes) {
         document.pdfName = req.file.originalname;
         document.pdfUrl = uploadRes.url;

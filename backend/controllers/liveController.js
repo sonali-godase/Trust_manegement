@@ -60,7 +60,7 @@ const createLiveStream = async (req, res) => {
 
     if (req.files) {
       if (req.files.thumbnail && req.files.thumbnail[0]) {
-        const uploadRes = await uploadToCloudinary(req.files.thumbnail[0].path, "livestreams", { resourceType: "image" });
+        const uploadRes = await uploadToCloudinary(req.files.thumbnail[0], "livestreams", { resourceType: "image" });
         if (uploadRes) {
           finalThumbnail = uploadRes.url;
           thumbnailPublicId = uploadRes.publicId;
@@ -70,7 +70,7 @@ const createLiveStream = async (req, res) => {
       }
       
       if (req.files.videoFile && req.files.videoFile[0]) {
-        const uploadRes = await uploadToCloudinary(req.files.videoFile[0].path, "livestreams", { resourceType: "video" });
+        const uploadRes = await uploadToCloudinary(req.files.videoFile[0], "livestreams", { resourceType: "video" });
         if (uploadRes) {
           finalVideoFile = uploadRes.url;
           videoFilePublicId = uploadRes.publicId;
@@ -135,7 +135,7 @@ const updateLiveStream = async (req, res) => {
         const oldPid = stream.thumbnailPublicId || extractPublicId(stream.thumbnail);
         if (oldPid) await deleteFromCloudinary(oldPid, "image");
 
-        const uploadRes = await uploadToCloudinary(req.files.thumbnail[0].path, "livestreams", { resourceType: "image" });
+        const uploadRes = await uploadToCloudinary(req.files.thumbnail[0], "livestreams", { resourceType: "image" });
         if (uploadRes) {
           stream.thumbnail = uploadRes.url;
           stream.thumbnailPublicId = uploadRes.publicId;
@@ -148,7 +148,7 @@ const updateLiveStream = async (req, res) => {
         const oldPid = stream.videoFilePublicId || extractPublicId(stream.videoFile);
         if (oldPid) await deleteFromCloudinary(oldPid, "video");
 
-        const uploadRes = await uploadToCloudinary(req.files.videoFile[0].path, "livestreams", { resourceType: "video" });
+        const uploadRes = await uploadToCloudinary(req.files.videoFile[0], "livestreams", { resourceType: "video" });
         if (uploadRes) {
           stream.videoFile = uploadRes.url;
           stream.videoFilePublicId = uploadRes.publicId;

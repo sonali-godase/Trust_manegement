@@ -184,19 +184,19 @@ exports.createNews = async (req, res) => {
 
     // Handle uploaded files
     if (req.files) {
-      if (req.files['coverImage']) {
-        const uploadRes = await uploadToCloudinary(req.files['coverImage'][0].path, "news/images", { resourceType: "image" });
+      if (req.files['coverImage'] && req.files['coverImage'][0]) {
+        const uploadRes = await uploadToCloudinary(req.files['coverImage'][0], "news/images", { resourceType: "image" });
         if (uploadRes) {
           newsData.coverImage = uploadRes.url;
           newsData.coverImagePublicId = uploadRes.publicId;
         }
       }
       
-      if (req.files['galleryImages']) {
+      if (req.files['galleryImages'] && req.files['galleryImages'].length > 0) {
         const galleryUrls = [];
         const galleryPublicIds = [];
         for (const file of req.files['galleryImages']) {
-          const uploadRes = await uploadToCloudinary(file.path, "news/images", { resourceType: "image" });
+          const uploadRes = await uploadToCloudinary(file, "news/images", { resourceType: "image" });
           if (uploadRes) {
             galleryUrls.push(uploadRes.url);
             galleryPublicIds.push(uploadRes.publicId);
@@ -260,37 +260,59 @@ exports.updateNews = async (req, res) => {
       newsData.expiryDate = null;
     }
 
+    // Handle retained gallery images
+    let retainedUrls = [];
+    if (newsData.retainedGalleryImages) {
+      try {
+        retainedUrls = typeof newsData.retainedGalleryImages === 'string'
+          ? JSON.parse(newsData.retainedGalleryImages)
+          : newsData.retainedGalleryImages;
+      } catch (e) {}
+      delete newsData.retainedGalleryImages;
+    } else {
+      retainedUrls = news.galleryImages || [];
+    }
+
     // Handle files upload
     if (req.files) {
-      if (req.files['coverImage']) {
+      if (req.files['coverImage'] && req.files['coverImage'][0]) {
         const oldPid = news.coverImagePublicId || extractPublicId(news.coverImage);
         if (oldPid) await deleteFromCloudinary(oldPid, "image");
 
-        const uploadRes = await uploadToCloudinary(req.files['coverImage'][0].path, "news/images", { resourceType: "image" });
+        const uploadRes = await uploadToCloudinary(req.files['coverImage'][0], "news/images", { resourceType: "image" });
         if (uploadRes) {
           newsData.coverImage = uploadRes.url;
           newsData.coverImagePublicId = uploadRes.publicId;
         }
       }
       
-      if (req.files['galleryImages']) {
-        if (news.galleryImagesPublicIds && news.galleryImagesPublicIds.length > 0) {
-          for (const pid of news.galleryImagesPublicIds) {
-            await deleteFromCloudinary(pid, "image");
+      const galleryUrls = [...retainedUrls];
+      const galleryPublicIds = [];
+
+      // Keep existing public IDs that are still in retainedUrls
+      if (news.galleryImages && news.galleryImagesPublicIds) {
+        news.galleryImages.forEach((url, idx) => {
+          if (retainedUrls.includes(url) && news.galleryImagesPublicIds[idx]) {
+            galleryPublicIds.push(news.galleryImagesPublicIds[idx]);
+          } else if (!retainedUrls.includes(url) && news.galleryImagesPublicIds[idx]) {
+            deleteFromCloudinary(news.galleryImagesPublicIds[idx], "image");
           }
-        }
-        const galleryUrls = [];
-        const galleryPublicIds = [];
+        });
+      }
+
+      if (req.files['galleryImages'] && req.files['galleryImages'].length > 0) {
         for (const file of req.files['galleryImages']) {
-          const uploadRes = await uploadToCloudinary(file.path, "news/images", { resourceType: "image" });
+          const uploadRes = await uploadToCloudinary(file, "news/images", { resourceType: "image" });
           if (uploadRes) {
             galleryUrls.push(uploadRes.url);
             galleryPublicIds.push(uploadRes.publicId);
           }
         }
-        newsData.galleryImages = galleryUrls;
-        newsData.galleryImagesPublicIds = galleryPublicIds;
       }
+      newsData.galleryImages = galleryUrls;
+      newsData.galleryImagesPublicIds = galleryPublicIds;
+    } else {
+      newsData.galleryImages = retainedUrls;
     }
 
     news = await News.findByIdAndUpdate(req.params.id, newsData, { returnDocument: 'after', runValidators: true });

@@ -17,7 +17,7 @@ exports.createBranch = async (req, res) => {
     let image = "";
     let imagePublicId = "";
     if (req.file) {
-      const uploadRes = await uploadToCloudinary(req.file.path, "branches", { resourceType: "image" });
+      const uploadRes = await uploadToCloudinary(req.file, "branches", { resourceType: "image" });
       if (uploadRes) {
         image = uploadRes.url;
         imagePublicId = uploadRes.publicId;
@@ -75,7 +75,7 @@ exports.updateBranch = async (req, res) => {
       const oldPid = existingBranch.imagePublicId || extractPublicId(existingBranch.image);
       if (oldPid) await deleteFromCloudinary(oldPid, "image");
 
-      const uploadRes = await uploadToCloudinary(req.file.path, "branches", { resourceType: "image" });
+      const uploadRes = await uploadToCloudinary(req.file, "branches", { resourceType: "image" });
       if (uploadRes) {
         updateData.image = uploadRes.url;
         updateData.imagePublicId = uploadRes.publicId;
