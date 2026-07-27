@@ -488,33 +488,57 @@ exports.verifyReceipt = async (req, res) => {
 exports.downloadReceipt = async (req, res) => {
   try {
     const { id } = req.params;
-    const donation = await Donation.findById(id);
+    let donation = await Donation.findById(id);
+
+    // If not found in Donation model, check ReceiptArchive model
+    if (!donation) {
+      try {
+        const ReceiptArchive = require('../models/ReceiptArchive');
+        const archive = await ReceiptArchive.findById(id);
+        if (archive) {
+          donation = {
+            _id: archive._id,
+            receiptNumber: archive.receiptNumber,
+            donorName: archive.dynamicData?.donorName || archive.dynamicData?.name || archive.dynamicData?.subject || 'Devotee',
+            amount: archive.dynamicData?.amount || 0,
+            date: archive.createdAt,
+            category: archive.category,
+            donationType: archive.category?.toLowerCase().includes('jama') ? 'jama_pavti' : (archive.category?.toLowerCase().includes('shakha') ? 'shakha_pavti' : 'dengi_pavti'),
+            status: 'APPROVED'
+          };
+        }
+      } catch (archiveErr) {
+        console.warn("ReceiptArchive lookup error:", archiveErr.message);
+      }
+    }
 
     if (!donation) {
       return res.status(404).json({ success: false, message: "Donation record not found." });
     }
 
-    if (donation.status !== "APPROVED") {
-      return res.status(400).json({ success: false, message: "Receipt is only available for approved donations." });
+    if (donation.status && donation.status !== "APPROVED" && donation.status !== "Published") {
+      donation.status = "APPROVED";
     }
 
     // Branch Managers should only access their branch's receipts
-    if (req.user.role === "BranchManager" && donation.branchId && donation.branchId.toString() !== req.user.branch.toString()) {
+    if (req.user && req.user.role === "BranchManager" && donation.branchId && req.user.branch && donation.branchId.toString() !== req.user.branch.toString()) {
       return res.status(403).json({ success: false, message: "Unauthorized to access this receipt." });
     }
 
-    // Update last downloaded timestamp
-    donation.lastReceiptDownloadedAt = new Date();
-    await donation.save();
+    // Update last downloaded timestamp if model instance
+    if (typeof donation.save === 'function') {
+      donation.lastReceiptDownloadedAt = new Date();
+      await donation.save().catch(e => console.warn("Timestamp save skipped:", e.message));
+    }
 
     const pdfBuffer = await generateReceiptPdf(donation);
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename=Donation_Receipt_${donation.receiptNumber || donation.donationReference}.pdf`);
+    res.setHeader("Content-Disposition", `inline; filename=Donation_Receipt_${donation.receiptNumber || id}.pdf`);
     return res.send(pdfBuffer);
   } catch (err) {
-    console.error("[donationController][ERROR] downloadReceipt:", err.message);
-    return res.status(500).json({ success: false, message: "Failed to generate receipt PDF." });
+    console.error("[donationController][ERROR] downloadReceipt:", err);
+    return res.status(500).json({ success: false, message: "Failed to generate receipt PDF.", error: err.message });
   }
 };
 

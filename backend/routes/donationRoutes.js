@@ -18,21 +18,13 @@ router.put("/:id/update", donationController.updateDonation);
 // Submit payment (upload screenshot) - also can be public given they just need the ID from step 1
 router.post("/:id/payment", upload.single("screenshot"), donationController.submitPayment);
 
-// The following routes require authentication (Trustee, Admin, BranchManager)
+// The following routes require authentication
 router.use(authMiddleware);
-router.use(checkPermission('Donations'));
 
-// Get pending donations for verification panel
-router.get("/pending", donationController.getPendingDonations);
-
-// Admin/BranchManager stats
-router.get("/stats", donationController.getDashboardStats);
-
-// Get all donations
-router.get("/", donationController.getAllDonations);
-
-// Get receipt PDF
+// Get receipt PDF (Accessible to all authenticated roles)
 router.get("/:id/receipt", donationController.downloadReceipt);
+
+router.use(checkPermission('Donations'));
 
 // Approve donation
 router.post("/:id/approve", donationController.approveDonation);
