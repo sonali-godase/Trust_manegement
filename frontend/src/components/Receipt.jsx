@@ -187,6 +187,9 @@ const Receipt = ({ donation, isUserSide = true }) => {
   if (lang === 'en' && purposeMapping[purposeTextRaw]) purposeTextRaw = purposeMapping[purposeTextRaw];
   if (lang === 'mr' && purposeMapping[purposeTextRaw]) purposeTextRaw = purposeMapping[purposeTextRaw];
 
+  const amountWords = amountWordsRaw;
+  const purposeText = purposeTextRaw;
+
   const receiptCategory = (donation.category || donation.type || donation.receiptType || donation.donationType || '').toLowerCase();
   const showSwamiji = receiptCategory.includes('shakha') || receiptCategory.includes('branch');
 
