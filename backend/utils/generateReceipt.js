@@ -154,16 +154,16 @@ exports.generateReceiptPdf = (rawDonation) => {
       if (effectiveType === "dengi_pavti") {
         try {
           const rawBuf = await generateDengiPavtiPdf(donation);
-          return resolve(toBuffer(rawBuf));
+          if (rawBuf) return resolve(toBuffer(rawBuf));
         } catch (e) {
-          return reject(e);
+          console.warn("Puppeteer Dengi Pavti generation failed, falling back to PDFKit engine:", e.message);
         }
       } else if (effectiveType === "shakha_pavti") {
         try {
           const rawBuf = await generateShakhaPavtiPdf(donation);
-          return resolve(toBuffer(rawBuf));
+          if (rawBuf) return resolve(toBuffer(rawBuf));
         } catch (e) {
-          return reject(e);
+          console.warn("Puppeteer Shakha Pavti generation failed, falling back to PDFKit engine:", e.message);
         }
       }
 
