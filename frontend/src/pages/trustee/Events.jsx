@@ -15,6 +15,60 @@ const getImageUrl = (url) => {
   return `${ASSETS_URL}/${url}`;
 };
 
+const EventMediaCard = ({ event }) => {
+  const allMedia = [];
+  if (event.featuredImage) allMedia.push({ type: 'image', url: event.featuredImage, label: 'Featured' });
+  if (event.galleryImages && Array.isArray(event.galleryImages)) {
+    event.galleryImages.forEach((img, i) => {
+      if (img) allMedia.push({ type: 'image', url: img, label: `Gallery ${i+1}` });
+    });
+  }
+  if (event.videoFile) allMedia.push({ type: 'video', url: event.videoFile, label: 'Video' });
+
+  const [activeIdx, setActiveIdx] = useState(0);
+  const currentMedia = allMedia[activeIdx] || { type: 'image', url: event.featuredImage || event.videoFile };
+
+  return (
+    <div className="flex flex-col w-full">
+      <EventMedia 
+        src={currentMedia.url} 
+        alt={event.title}
+        aspectRatio="aspect-video"
+        objectFit="cover"
+        allowLightbox={true}
+      />
+      {allMedia.length > 1 && (
+        <div className="flex items-center gap-2 p-2 bg-stone-900 overflow-x-auto custom-scrollbar">
+          {allMedia.map((m, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                setActiveIdx(idx);
+              }}
+              className={`relative w-11 h-11 rounded-lg overflow-hidden shrink-0 border-2 transition-all ${activeIdx === idx ? 'border-amber-400 scale-105 shadow-md' : 'border-white/20 opacity-60 hover:opacity-100'}`}
+              title={m.label}
+            >
+              {m.type === 'video' ? (
+                <div className="w-full h-full bg-slate-900 text-white flex flex-col items-center justify-center text-[9px] font-bold">
+                  <span>PLAY</span>
+                </div>
+              ) : (
+                <img src={getImageUrl(m.url)} alt="" className="w-full h-full object-cover" />
+              )}
+            </button>
+          ))}
+          <span className="text-[10px] text-stone-300 font-bold px-1.5 shrink-0">
+            {activeIdx + 1}/{allMedia.length}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AdminEvents = () => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,121 +101,7 @@ const AdminEvents = () => {
   });
   const [imageFile, setImageFile] = useState(null);
   const [videoFile, setVideoFile] = useState(null);
-
-
-  useEffect(() => {
-    fetchBranches();
-    fetchEvents();
-
-    const socket = io(import.meta.env.VITE_ASSETS_URL || "http://localhost:5000");
-
-    socket.on("event_created", (newEvent) => setEvents((prev) => [newEvent, ...prev]));
-    socket.on("event_updated", (updatedEvent) => setEvents((prev) => prev.map((e) => (e._id === updatedEvent._id ? updatedEvent : e))));
-    socket.on("event_deleted", (deletedId) => setEvents((prev) => prev.filter((e) => e._id !== deletedId)));
-
-    return () => socket.disconnect();
-  }, []);
-
-  const fetchBranches = async () => {
-    try {
-      const res = await api.get('/branches');
-      setBranches(res.data.branches || []);
-    } catch (err) {
-      console.error("Failed to fetch branches", err);
-    }
-  };
-
-  const fetchEvents = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get("/events/admin");
-      setEvents(res.data.data || []);
-      setError("");
-    } catch (err) {
-      console.error(err);
-      setError("Failed to fetch events.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchLiveStreams = async () => {
-    try {
-      const [currentRes, historyRes] = await Promise.all([
-        api.get('/live/current'),
-        api.get('/live/history')
-      ]);
-      setLiveStream(currentRes.data.data);
-      setPastVideos(historyRes.data.history || []);
-    } catch (err) {
-      console.error("Failed to fetch live streams", err);
-    }
-  };
-
-  useEffect(() => {
-    fetchLiveStreams();
-  }, [activeTab]);
-
-  const handleLiveSubmit = async (e, isLive) => {
-    e.preventDefault();
-    try {
-      if (isLive) {
-        if (liveStream) {
-          await api.put(`/live/${liveStream._id}`, { ...liveFormData, isLive });
-        } else {
-          await api.post('/live', { ...liveFormData, isLive });
-        }
-      } else {
-        const formDataPayload = new FormData();
-        Object.keys(liveFormData).forEach(key => {
-          if (liveFormData[key] !== undefined && liveFormData[key] !== null) {
-            formDataPayload.append(key, liveFormData[key]);
-          }
-        });
-        formDataPayload.append('isLive', 'false');
-        if (liveVideoFile) formDataPayload.append('videoFile', liveVideoFile);
-        if (liveThumbnailFile) formDataPayload.append('thumbnail', liveThumbnailFile);
-        
-        await api.post('/live', formDataPayload, { headers: { 'Content-Type': 'multipart/form-data' } });
-      }
-      
-      fetchLiveStreams();
-      if (!isLive) {
-        setLiveFormData({ title: '', description: '', streamUrl: '', scheduledAt: '' });
-        setLiveVideoFile(null);
-        setLiveThumbnailFile(null);
-      }
-      alert(isLive ? "Live Aarati Started!" : "Past Video Added!");
-    } catch (err) {
-      console.error(err);
-      alert("Error saving live stream.");
-    }
-  };
-  
-  const handleStopLive = async () => {
-    if (!liveStream) return;
-    try {
-      await api.put(`/live/${liveStream._id}`, { isLive: false, title: liveStream.title, streamUrl: liveStream.streamUrl });
-      fetchLiveStreams();
-      alert("Live Aarati Stopped.");
-    } catch (err) {
-      alert("Error stopping live stream.");
-    }
-  };
-  
-  const handleDeleteLive = async (id) => {
-    if(!window.confirm("Delete this video?")) return;
-    try {
-      await api.delete(`/live/${id}`);
-      fetchLiveStreams();
-    } catch(err) {
-      alert("Error deleting");
-    }
-  };
-
-  const handleInputChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-  const handleFileChange = (e) => setImageFile(e.target.files[0]);
-  const handleVideoChange = (e) => setVideoFile(e.target.files[0]);
+  const [galleryFiles, setGalleryFiles] = useState([]);
 
   const openModal = (event = null) => {
     if (event) {
@@ -184,6 +124,7 @@ const AdminEvents = () => {
     }
     setImageFile(null);
     setVideoFile(null);
+    setGalleryFiles([]);
     setShowModal(true);
   };
 
@@ -213,6 +154,11 @@ const AdminEvents = () => {
       });
       if (imageFile) data.append("featuredImage", imageFile);
       if (videoFile) data.append("videoFile", videoFile);
+      if (galleryFiles && galleryFiles.length > 0) {
+        galleryFiles.forEach(file => {
+          data.append("galleryImages", file);
+        });
+      }
 
       if (editingEvent) {
         await api.put(`/events/admin/${editingEvent._id}`, data);
@@ -321,13 +267,7 @@ const AdminEvents = () => {
                   
                   {/* MEDIA BANNER */}
                   <div className="relative bg-stone-100 overflow-hidden rounded-t-3xl">
-                    <EventMedia 
-                      src={event.featuredImage || event.videoFile} 
-                      alt={event.title}
-                      aspectRatio="aspect-video"
-                      objectFit="cover"
-                      allowLightbox={true}
-                    />
+                    <EventMediaCard event={event} />
                     
                     {/* Status Badge */}
                     <div className="absolute top-3 left-3 z-20 pointer-events-none">
@@ -596,10 +536,29 @@ const AdminEvents = () => {
                   </div>
 
                   <div className="md:col-span-2 border-t border-gray-100 pt-5">
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Upload Historical/Past Video (Optional)</label>
-                    <input type="file" accept="video/mp4,video/webm,video/ogg" onChange={handleVideoChange} className="w-full border border-gray-300 rounded-xl px-4 py-2 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-600 hover:file:bg-blue-100 outline-none" />
-                    <p className="text-xs text-gray-400 mt-2">Upload past event recordings to display in Historical Archives (Max 100MB).</p>
-                    {editingEvent?.videoFile && <p className="text-xs text-green-600 mt-1">Video currently uploaded: Yes</p>}
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Upload Additional Gallery Photos (Multiple Dynamic Images)</label>
+                    <input type="file" accept="image/*" multiple onChange={(e) => setGalleryFiles(Array.from(e.target.files))} className="w-full border border-gray-300 rounded-xl px-4 py-2 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 outline-none" />
+                    <p className="text-xs text-gray-400 mt-2">Select multiple photos to create an event gallery.</p>
+                    {galleryFiles.length > 0 && (
+                      <p className="text-xs text-indigo-600 font-bold mt-1.5">{galleryFiles.length} gallery images selected for upload.</p>
+                    )}
+                    {editingEvent?.galleryImages && editingEvent.galleryImages.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-xs font-bold text-gray-600 mb-2">Existing Gallery Images ({editingEvent.galleryImages.length}):</p>
+                        <div className="flex flex-wrap gap-2">
+                          {editingEvent.galleryImages.map((img, idx) => (
+                            <img key={idx} src={getImageUrl(img)} alt={`Gallery ${idx}`} className="w-12 h-12 object-cover rounded-lg border border-gray-200" />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="md:col-span-2 border-t border-gray-100 pt-5">
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Upload Event Video File (Dynamic Video)</label>
+                    <input type="file" accept="video/mp4,video/webm,video/ogg,video/*" onChange={handleVideoChange} className="w-full border border-gray-300 rounded-xl px-4 py-2 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-600 hover:file:bg-blue-100 outline-none" />
+                    <p className="text-xs text-gray-400 mt-2">Upload event video to display dynamically in event banner & archives (Max 100MB).</p>
+                    {editingEvent?.videoFile && <p className="text-xs text-green-600 font-bold mt-1">✓ Current Video Uploaded: Yes</p>}
                   </div>
 
                   <div className="md:col-span-2 mb-4">

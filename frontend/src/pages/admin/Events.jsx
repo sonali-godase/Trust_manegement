@@ -16,6 +16,60 @@ const getImageUrl = (url) => {
   return `${ASSETS_URL}/${url}`;
 };
 
+const EventMediaCard = ({ event }) => {
+  const allMedia = [];
+  if (event.featuredImage) allMedia.push({ type: 'image', url: event.featuredImage, label: 'Featured' });
+  if (event.galleryImages && Array.isArray(event.galleryImages)) {
+    event.galleryImages.forEach((img, i) => {
+      if (img) allMedia.push({ type: 'image', url: img, label: `Gallery ${i+1}` });
+    });
+  }
+  if (event.videoFile) allMedia.push({ type: 'video', url: event.videoFile, label: 'Video' });
+
+  const [activeIdx, setActiveIdx] = useState(0);
+  const currentMedia = allMedia[activeIdx] || { type: 'image', url: event.featuredImage || event.videoFile };
+
+  return (
+    <div className="flex flex-col w-full">
+      <EventMedia 
+        src={currentMedia.url} 
+        alt={event.title}
+        aspectRatio="aspect-video"
+        objectFit="cover"
+        allowLightbox={true}
+      />
+      {allMedia.length > 1 && (
+        <div className="flex items-center gap-2 p-2 bg-stone-900 overflow-x-auto custom-scrollbar">
+          {allMedia.map((m, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                setActiveIdx(idx);
+              }}
+              className={`relative w-10 h-10 rounded-lg overflow-hidden shrink-0 border-2 transition-all ${activeIdx === idx ? 'border-amber-400 scale-105 shadow-md' : 'border-white/20 opacity-60 hover:opacity-100'}`}
+              title={m.label}
+            >
+              {m.type === 'video' ? (
+                <div className="w-full h-full bg-slate-900 text-white flex flex-col items-center justify-center text-[8px] font-bold">
+                  <span>PLAY</span>
+                </div>
+              ) : (
+                <img src={getImageUrl(m.url)} alt="" className="w-full h-full object-cover" />
+              )}
+            </button>
+          ))}
+          <span className="text-[10px] text-stone-300 font-bold px-1 shrink-0">
+            {activeIdx + 1}/{allMedia.length}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AdminEvents = () => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -138,13 +192,7 @@ const AdminEvents = () => {
             <motion.div key={event._id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: index * 0.05 }} className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-all group flex flex-col relative">
               
               <div className="relative bg-stone-100 overflow-hidden rounded-t-2xl">
-                <EventMedia 
-                  src={event.featuredImage || event.videoFile} 
-                  alt={event.title}
-                  aspectRatio="aspect-video"
-                  objectFit="cover"
-                  allowLightbox={true}
-                />
+                <EventMediaCard event={event} />
                 
                 {/* Status Badge */}
                 <div className="absolute top-3 left-3 z-20 pointer-events-none">
