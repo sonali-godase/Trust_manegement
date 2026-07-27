@@ -6,6 +6,13 @@ import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import api from '../../utils/api';
 
+const getMediaUrl = (url) => {
+  if (!url || typeof url !== 'string' || url.includes('undefined')) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  const backendUrl = import.meta.env.VITE_ASSETS_URL || (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '') : "http://localhost:5000");
+  return `${backendUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 const MathHistory = () => {
   const [historyRecords, setHistoryRecords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -114,6 +121,7 @@ const MathHistory = () => {
                     const isEven = index % 2 === 0;
                     const mediaArray = record.media || [];
                     const mainMedia = mediaArray.length > 0 ? mediaArray[0] : null;
+                    const mediaUrl = mainMedia ? getMediaUrl(mainMedia.url) : null;
 
                     return (
                       <motion.div 
@@ -151,20 +159,21 @@ const MathHistory = () => {
                          
                          {/* Visual / Media Half */}
                          <div className="w-full lg:w-1/2 group">
-                            {mainMedia ? (
+                            {mediaUrl ? (
                                <div className={`relative h-[400px] lg:h-[600px] w-full rounded-[2.5rem] overflow-hidden shadow-lg border border-stone-200 bg-white transition-all duration-700 hover:shadow-2xl hover:border-mahakal-saffron/30 p-2`}>
                                  <div className="w-full h-full rounded-[2rem] overflow-hidden relative">
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                                     {mainMedia.type === 'image' ? (
                                         <img 
-                                          src={mainMedia.url} 
+                                          src={mediaUrl} 
                                           alt={record.title} 
+                                          onError={(e) => { e.target.style.display = 'none'; }}
                                           className="w-full h-full object-cover object-[50%_20%] group-hover:scale-105 transition-transform duration-[2s] ease-out" 
                                         />
                                     ) : mainMedia.type === 'video' ? (
                                         <div className="relative w-full h-full">
                                           <video 
-                                            src={mainMedia.url} 
+                                            src={mediaUrl} 
                                             className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-[2s] ease-out"
                                             autoPlay muted loop playsInline
                                           />
