@@ -13,16 +13,15 @@ const eventSchema = new mongoose.Schema({
   },
   shortDescription: {
     type: String,
-    required: [true, 'Short description is required'],
-    maxlength: [200, 'Short description cannot exceed 200 characters']
+    default: ''
   },
   fullDescription: {
     type: String,
-    required: [true, 'Full description is required']
+    required: [true, 'Description is required']
   },
   featuredImage: {
     type: String,
-    required: [true, 'Featured image is required']
+    default: ''
   },
   featuredImagePublicId: {
     type: String,

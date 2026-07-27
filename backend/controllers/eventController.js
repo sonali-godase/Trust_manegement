@@ -55,7 +55,7 @@ exports.createEvent = async (req, res) => {
     // Process files if available
     if (req.files) {
       if (req.files['featuredImage']) {
-        const uploadRes = await uploadToCloudinary(req.files['featuredImage'][0].path, "events/images", { resourceType: "image" });
+        const uploadRes = await uploadToCloudinary(req.files['featuredImage'][0], "events/images", { resourceType: "image" });
         if (uploadRes) {
           eventData.featuredImage = uploadRes.url;
           eventData.featuredImagePublicId = uploadRes.publicId;
@@ -66,7 +66,7 @@ exports.createEvent = async (req, res) => {
         const galleryUrls = [];
         const galleryPublicIds = [];
         for (const file of req.files['galleryImages']) {
-          const uploadRes = await uploadToCloudinary(file.path, "events/images", { resourceType: "image" });
+          const uploadRes = await uploadToCloudinary(file, "events/images", { resourceType: "image" });
           if (uploadRes) {
             galleryUrls.push(uploadRes.url);
             galleryPublicIds.push(uploadRes.publicId);
@@ -77,7 +77,7 @@ exports.createEvent = async (req, res) => {
       }
 
       if (req.files['videoFile']) {
-        const uploadRes = await uploadToCloudinary(req.files['videoFile'][0].path, "events/videos", { resourceType: "video" });
+        const uploadRes = await uploadToCloudinary(req.files['videoFile'][0], "events/videos", { resourceType: "video" });
         if (uploadRes) {
           eventData.videoFile = uploadRes.url;
           eventData.videoFilePublicId = uploadRes.publicId;
@@ -85,9 +85,11 @@ exports.createEvent = async (req, res) => {
       }
     }
     
-    // Default values mapping from frontend to backend if needed
-    if (eventData.tags && typeof eventData.tags === 'string') {
-       eventData.tags = eventData.tags.split(',').map(tag => tag.trim());
+    if (!eventData.shortDescription && eventData.fullDescription) {
+      eventData.shortDescription = eventData.fullDescription.substring(0, 195);
+    }
+    if (!eventData.fullDescription && eventData.shortDescription) {
+      eventData.fullDescription = eventData.shortDescription;
     }
 
     if (req.user && req.user.role === 'BranchManager') {
@@ -105,6 +107,7 @@ exports.createEvent = async (req, res) => {
     
     res.status(201).json({ success: true, data: processed });
   } catch (error) {
+    console.error("Error creating event:", error);
     res.status(400).json({ success: false, message: error.message });
   }
 };
@@ -123,7 +126,7 @@ exports.updateEvent = async (req, res) => {
         if (oldPublicId) {
           await deleteFromCloudinary(oldPublicId, "image");
         }
-        const uploadRes = await uploadToCloudinary(req.files['featuredImage'][0].path, "events/images", { resourceType: "image" });
+        const uploadRes = await uploadToCloudinary(req.files['featuredImage'][0], "events/images", { resourceType: "image" });
         if (uploadRes) {
           eventData.featuredImage = uploadRes.url;
           eventData.featuredImagePublicId = uploadRes.publicId;
@@ -139,7 +142,7 @@ exports.updateEvent = async (req, res) => {
         const galleryUrls = [];
         const galleryPublicIds = [];
         for (const file of req.files['galleryImages']) {
-          const uploadRes = await uploadToCloudinary(file.path, "events/images", { resourceType: "image" });
+          const uploadRes = await uploadToCloudinary(file, "events/images", { resourceType: "image" });
           if (uploadRes) {
             galleryUrls.push(uploadRes.url);
             galleryPublicIds.push(uploadRes.publicId);
@@ -154,12 +157,23 @@ exports.updateEvent = async (req, res) => {
         if (oldPublicId) {
           await deleteFromCloudinary(oldPublicId, "video");
         }
-        const uploadRes = await uploadToCloudinary(req.files['videoFile'][0].path, "events/videos", { resourceType: "video" });
+        const uploadRes = await uploadToCloudinary(req.files['videoFile'][0], "events/videos", { resourceType: "video" });
         if (uploadRes) {
           eventData.videoFile = uploadRes.url;
           eventData.videoFilePublicId = uploadRes.publicId;
         }
       }
+    }
+
+    if (!eventData.featuredImage && existingEvent.featuredImage) {
+      eventData.featuredImage = existingEvent.featuredImage;
+      eventData.featuredImagePublicId = existingEvent.featuredImagePublicId;
+    }
+    if (!eventData.shortDescription) {
+      eventData.shortDescription = (eventData.fullDescription || existingEvent.fullDescription || '').substring(0, 195);
+    }
+    if (!eventData.fullDescription) {
+      eventData.fullDescription = existingEvent.fullDescription;
     }
     
     if (eventData.tags && typeof eventData.tags === 'string') {
@@ -182,6 +196,7 @@ exports.updateEvent = async (req, res) => {
     
     res.status(200).json({ success: true, data: processed });
   } catch (error) {
+    console.error("Error updating event:", error);
     res.status(400).json({ success: false, message: error.message });
   }
 };

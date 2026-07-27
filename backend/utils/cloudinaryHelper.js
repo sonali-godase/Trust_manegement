@@ -26,11 +26,10 @@ const uploadToCloudinary = async (fileInput, folder = "uploads", options = {}) =
       resource_type: resourceType
     };
 
-    // Case 1: Multer file object with buffer (memory storage) or raw Buffer
-    const isBuffer = Buffer.isBuffer(fileInput) || (fileInput && fileInput.buffer && Buffer.isBuffer(fileInput.buffer));
-    const buffer = Buffer.isBuffer(fileInput) ? fileInput : (fileInput && fileInput.buffer);
+    // Case 1: Multer file object or object with .buffer or raw Buffer or .path
+    const buffer = Buffer.isBuffer(fileInput) ? fileInput : (fileInput?.buffer || (fileInput?.path && fs.existsSync(fileInput.path) ? fs.readFileSync(fileInput.path) : null));
 
-    if (isBuffer && buffer) {
+    if (buffer) {
       return new Promise((resolve) => {
         const stream = cloudinaryInstance.uploader.upload_stream(
           uploadOptions,
@@ -50,7 +49,7 @@ const uploadToCloudinary = async (fileInput, folder = "uploads", options = {}) =
       });
     }
 
-    // Case 2: File path string or Multer file object with .path
+    // Case 2: File path string
     const filePath = typeof fileInput === "string" ? fileInput : fileInput?.path;
     if (filePath && fs.existsSync(filePath)) {
       const result = await cloudinaryInstance.uploader.upload(filePath, uploadOptions);

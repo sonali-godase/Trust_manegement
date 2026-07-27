@@ -29,7 +29,7 @@ const EventMediaCard = ({ event }) => {
   const currentMedia = allMedia[activeIdx] || { type: 'image', url: event.featuredImage || event.videoFile };
 
   return (
-    <div className="flex flex-col w-full">
+    <div className="flex flex-col w-full relative">
       <EventMedia 
         src={currentMedia.url} 
         alt={event.title}
@@ -38,7 +38,7 @@ const EventMediaCard = ({ event }) => {
         allowLightbox={true}
       />
       {allMedia.length > 1 && (
-        <div className="flex items-center gap-2 p-2 bg-stone-900 overflow-x-auto custom-scrollbar">
+        <div className="flex items-center gap-1.5 p-1.5 bg-stone-900 overflow-x-auto custom-scrollbar">
           {allMedia.map((m, idx) => (
             <button
               key={idx}
@@ -48,11 +48,11 @@ const EventMediaCard = ({ event }) => {
                 e.preventDefault();
                 setActiveIdx(idx);
               }}
-              className={`relative w-11 h-11 rounded-lg overflow-hidden shrink-0 border-2 transition-all ${activeIdx === idx ? 'border-amber-400 scale-105 shadow-md' : 'border-white/20 opacity-60 hover:opacity-100'}`}
+              className={`relative w-8 h-8 md:w-9 md:h-9 rounded-md overflow-hidden shrink-0 border-2 transition-all ${activeIdx === idx ? 'border-amber-400 scale-105 shadow-md' : 'border-white/20 opacity-60 hover:opacity-100'}`}
               title={m.label}
             >
               {m.type === 'video' ? (
-                <div className="w-full h-full bg-slate-900 text-white flex flex-col items-center justify-center text-[9px] font-bold">
+                <div className="w-full h-full bg-slate-900 text-white flex flex-col items-center justify-center text-[8px] font-bold">
                   <span>PLAY</span>
                 </div>
               ) : (
@@ -60,7 +60,7 @@ const EventMediaCard = ({ event }) => {
               )}
             </button>
           ))}
-          <span className="text-[10px] text-stone-300 font-bold px-1.5 shrink-0">
+          <span className="text-[9px] text-stone-300 font-bold px-1 shrink-0">
             {activeIdx + 1}/{allMedia.length}
           </span>
         </div>
@@ -102,6 +102,120 @@ const AdminEvents = () => {
   const [imageFile, setImageFile] = useState(null);
   const [videoFile, setVideoFile] = useState(null);
   const [galleryFiles, setGalleryFiles] = useState([]);
+
+  const handleInputChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleFileChange = (e) => setImageFile(e.target.files[0]);
+  const handleVideoChange = (e) => setVideoFile(e.target.files[0]);
+
+  useEffect(() => {
+    fetchBranches();
+    fetchEvents();
+
+    const socket = io(import.meta.env.VITE_ASSETS_URL || "http://localhost:5000");
+
+    socket.on("event_created", (newEvent) => setEvents((prev) => [newEvent, ...prev]));
+    socket.on("event_updated", (updatedEvent) => setEvents((prev) => prev.map((e) => (e._id === updatedEvent._id ? updatedEvent : e))));
+    socket.on("event_deleted", (deletedId) => setEvents((prev) => prev.filter((e) => e._id !== deletedId)));
+
+    return () => socket.disconnect();
+  }, []);
+
+  const fetchBranches = async () => {
+    try {
+      const res = await api.get('/branches');
+      setBranches(res.data.branches || []);
+    } catch (err) {
+      console.error("Failed to fetch branches", err);
+    }
+  };
+
+  const fetchEvents = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/events/admin");
+      setEvents(res.data.data || []);
+      setError("");
+    } catch (err) {
+      console.error(err);
+      setError("Failed to fetch events.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchLiveStreams = async () => {
+    try {
+      const [currentRes, historyRes] = await Promise.all([
+        api.get('/live/current'),
+        api.get('/live/history')
+      ]);
+      setLiveStream(currentRes.data.data);
+      setPastVideos(historyRes.data.history || []);
+    } catch (err) {
+      console.error("Failed to fetch live streams", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveStreams();
+  }, [activeTab]);
+
+  const handleLiveSubmit = async (e, isLive) => {
+    e.preventDefault();
+    try {
+      if (isLive) {
+        if (liveStream) {
+          await api.put(`/live/${liveStream._id}`, { ...liveFormData, isLive });
+        } else {
+          await api.post('/live', { ...liveFormData, isLive });
+        }
+      } else {
+        const formDataPayload = new FormData();
+        Object.keys(liveFormData).forEach(key => {
+          if (liveFormData[key] !== undefined && liveFormData[key] !== null) {
+            formDataPayload.append(key, liveFormData[key]);
+          }
+        });
+        formDataPayload.append('isLive', 'false');
+        if (liveVideoFile) formDataPayload.append('videoFile', liveVideoFile);
+        if (liveThumbnailFile) formDataPayload.append('thumbnail', liveThumbnailFile);
+        
+        await api.post('/live', formDataPayload, { headers: { 'Content-Type': 'multipart/form-data' } });
+      }
+      
+      fetchLiveStreams();
+      if (!isLive) {
+        setLiveFormData({ title: '', description: '', streamUrl: '', scheduledAt: '' });
+        setLiveVideoFile(null);
+        setLiveThumbnailFile(null);
+      }
+      alert(isLive ? "Live Aarati Started!" : "Past Video Added!");
+    } catch (err) {
+      console.error(err);
+      alert("Error saving live stream.");
+    }
+  };
+  
+  const handleStopLive = async () => {
+    if (!liveStream) return;
+    try {
+      await api.put(`/live/${liveStream._id}`, { isLive: false, title: liveStream.title, streamUrl: liveStream.streamUrl });
+      fetchLiveStreams();
+      alert("Live Aarati Stopped.");
+    } catch (err) {
+      alert("Error stopping live stream.");
+    }
+  };
+  
+  const handleDeleteLive = async (id) => {
+    if(!window.confirm("Delete this video?")) return;
+    try {
+      await api.delete(`/live/${id}`);
+      fetchLiveStreams();
+    } catch(err) {
+      alert("Error deleting");
+    }
+  };
 
   const openModal = (event = null) => {
     if (event) {
@@ -170,7 +284,7 @@ const AdminEvents = () => {
       fetchEvents();
     } catch (err) {
       console.error(err);
-      alert("Failed to save event. Check console.");
+      alert(err.response?.data?.message || err.message || "Failed to save event.");
     } finally {
       setFormLoading(false);
     }
@@ -261,62 +375,60 @@ const AdminEvents = () => {
           {loading ? (
             <div className="flex justify-center py-20"><FaSpinner className="animate-spin text-5xl text-gray-400" /></div>
           ) : filteredEvents.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
               {filteredEvents.map((event, index) => (
-                <motion.div key={event._id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: index * 0.05 }} className="bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-lg transition-all group flex flex-col">
+                <motion.div key={event._id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: index * 0.04 }} className="bg-white rounded-2xl overflow-hidden border border-slate-200/80 shadow-sm hover:shadow-md transition-all group flex flex-col">
                   
                   {/* MEDIA BANNER */}
-                  <div className="relative bg-stone-100 overflow-hidden rounded-t-3xl">
+                  <div className="relative bg-stone-900 overflow-hidden rounded-t-2xl">
                     <EventMediaCard event={event} />
                     
                     {/* Status Badge */}
-                    <div className="absolute top-3 left-3 z-20 pointer-events-none">
-                      <span className="px-3 py-1 backdrop-blur-md rounded-full text-[10px] font-bold uppercase tracking-widest text-stone-900 shadow-sm bg-white/90">
+                    <div className="absolute top-2.5 left-2.5 z-20 pointer-events-none">
+                      <span className="px-2.5 py-0.5 backdrop-blur-md rounded-full text-[9px] font-bold uppercase tracking-wider text-slate-900 shadow-sm bg-white/90">
                         {event.status}
                       </span>
                     </div>
                     
                     {/* Date Badge */}
-                    <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-md rounded-xl text-center overflow-hidden shadow-md min-w-[3rem] border border-white/60 pointer-events-none">
-                      <div className="bg-stone-100 text-stone-600 text-[8px] font-bold uppercase tracking-widest py-0.5 px-2 border-b border-stone-200">{new Date(event.eventDate).toLocaleDateString("en-US", { month: "short" })}</div>
-                      <div className="text-base font-black text-stone-900 py-0.5">{new Date(event.eventDate).getDate()}</div>
+                    <div className="absolute top-2.5 right-2.5 z-20 bg-white/95 backdrop-blur-md rounded-lg text-center overflow-hidden shadow border border-white/60 pointer-events-none min-w-[2.75rem]">
+                      <div className="bg-stone-100 text-stone-600 text-[8px] font-bold uppercase tracking-wider py-0.5 px-1.5 border-b border-stone-200">{new Date(event.eventDate).toLocaleDateString("en-US", { month: "short" })}</div>
+                      <div className="text-xs md:text-sm font-black text-stone-900 py-0.5">{new Date(event.eventDate).getDate()}</div>
                     </div>
                   </div>
 
-                  <div className="p-5 md:p-6 flex flex-col flex-1">
-                    <div className="mb-2">
-                      <span className="inline-block px-2.5 py-0.5 bg-blue-50 text-blue-700 rounded-full text-[10px] font-bold uppercase tracking-wider border border-blue-200/60">
+                  <div className="p-4 flex flex-col flex-1">
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <span className="inline-block px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md text-[10px] font-bold uppercase tracking-wider border border-blue-200/60">
                         {event.branch?.name || "Global"}
                       </span>
                     </div>
                     
-                    <h2 className="text-stone-900 text-lg md:text-xl font-bold font-serif line-clamp-1 mb-2 group-hover:text-blue-600 transition-colors">{event.title}</h2>
-                    <p className="text-gray-500 text-xs md:text-sm line-clamp-2 mb-3 md:mb-6 flex-1">{event.shortDescription || event.fullDescription}</p>
+                    <h2 className="text-slate-900 text-base md:text-lg font-bold line-clamp-1 mb-1 group-hover:text-blue-600 transition-colors">{event.title}</h2>
+                    <p className="text-slate-500 text-xs line-clamp-2 mb-3 flex-1">{event.shortDescription || event.fullDescription}</p>
                     
-                    <div className="flex flex-row items-center justify-between gap-2 mb-3 md:mb-6 bg-gray-50 p-3 md:p-4 rounded-xl md:rounded-2xl border border-gray-100 overflow-hidden">
-                      <div className="flex items-center gap-1.5 md:gap-2 text-[10px] md:text-sm text-gray-700 font-medium overflow-hidden">
-                        <div className="w-5 h-5 md:w-8 md:h-8 rounded-full bg-white flex items-center justify-center shadow-sm text-gray-400 text-[10px] md:text-xs shrink-0"><FaMapMarkerAlt /></div>
+                    <div className="flex flex-row items-center justify-between gap-2 mb-3 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 text-xs text-slate-700 font-medium overflow-hidden">
+                      <div className="flex items-center gap-1.5 overflow-hidden">
+                        <FaMapMarkerAlt className="text-slate-400 shrink-0 text-xs" />
                         <span className="truncate">{event.location}</span>
                       </div>
-                      <div className="flex items-center gap-1.5 md:gap-2 text-[10px] md:text-sm text-gray-700 font-medium shrink-0">
-                        <div className="w-5 h-5 md:w-8 md:h-8 rounded-full bg-white flex items-center justify-center shadow-sm text-gray-400 text-[10px] md:text-xs shrink-0"><FaClock /></div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <FaClock className="text-slate-400 shrink-0 text-xs" />
                         <span>{event.eventTime}</span>
                       </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-2 pt-3 md:pt-4 border-t border-gray-100">
+                    <div className="flex items-center gap-2 pt-3 border-t border-slate-100 mt-auto">
                       {hasManage ? (
                         <>
-                          <button onClick={() => togglePublish(event._id)} className={`flex-1 sm:flex-[1.5] py-2 md:py-3 rounded-xl font-bold flex items-center justify-center gap-1.5 md:gap-2 transition-colors text-xs md:text-sm ${event.isPublished ? 'bg-[#10B981] hover:bg-[#059669] text-white shadow-sm' : 'bg-gray-500 hover:bg-gray-600 text-white shadow-sm'}`}>
-                            {event.isPublished ? 'Live on User Side' : 'Draft (Hidden)'}
+                          <button onClick={() => togglePublish(event._id)} className={`flex-1 py-2 px-3 rounded-lg font-bold flex items-center justify-center gap-1 transition-colors text-xs ${event.isPublished ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm' : 'bg-slate-500 hover:bg-slate-600 text-white shadow-sm'}`}>
+                            {event.isPublished ? 'Live' : 'Draft'}
                           </button>
-                          <div className="flex gap-2 flex-1">
-                            <button onClick={() => openModal(event)} className="flex-1 py-2 md:py-3 bg-[#2E90FA] hover:bg-[#1570EF] text-white rounded-xl font-bold flex items-center justify-center gap-1.5 md:gap-2 transition-colors text-xs md:text-sm shadow-sm"><FaEdit /> Edit</button>
-                            <button onClick={() => deleteEvent(event._id)} className="flex-1 py-2 md:py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 md:gap-2 transition-colors text-xs md:text-sm shadow-sm"><FaTrash /> Del</button>
-                          </div>
+                          <button onClick={() => openModal(event)} className="py-2 px-3 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-bold flex items-center justify-center gap-1 transition-colors text-xs shadow-sm"><FaEdit size={12} /> Edit</button>
+                          <button onClick={() => deleteEvent(event._id)} className="py-2 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold flex items-center justify-center gap-1 transition-colors text-xs shadow-sm"><FaTrash size={12} /></button>
                         </>
                       ) : (
-                        <div className="w-full text-center text-xs text-gray-400 py-2">Action buttons disabled</div>
+                        <div className="w-full text-center text-xs text-slate-400 py-1">View Only Access</div>
                       )}
                     </div>
                   </div>

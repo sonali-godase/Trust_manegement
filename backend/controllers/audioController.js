@@ -1,37 +1,16 @@
 const AudioTrack = require('../models/AudioTrack');
-const cloudinary = require('../config/cloudinary');
+const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require('../utils/cloudinaryHelper');
 const youtubedl = require('youtube-dl-exec');
-const { generateVTTFromUrl } = require('../utils/transcribe');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-// Helper to upload a local file to Cloudinary
-const uploadToCloudinary = async (filePath, resourceType = 'auto') => {
-  try {
-    const cloudinaryInstance = await cloudinary.getCloudinary();
-    if (cloudinaryInstance) {
-      const result = await cloudinaryInstance.uploader.upload(filePath, {
-        resource_type: resourceType,
-        folder: 'aashram_audio',
-      });
-      return result.secure_url;
-    } else {
-      console.log("Cloudinary not configured. Falling back to local static URL.");
-    }
-  } catch (error) {
-    console.error("Cloudinary upload error, falling back to local static URL:", error.message);
-  }
-
-  // Return local static path as fallback
-  const filename = path.basename(filePath);
-  const normalizedPath = filePath.replace(/\\/g, '/');
-  if (normalizedPath.includes('/uploads/documents/')) {
-    return `/uploads/documents/${filename}`;
-  }
-  return `/uploads/${filename}`;
+const extractYoutubeId = (url) => {
+  if (!url) return null;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : null;
 };
-
 
 exports.importFromYoutube = async (req, res) => {
   try {
@@ -41,82 +20,56 @@ exports.importFromYoutube = async (req, res) => {
       return res.status(400).json({ message: 'YouTube URL is required' });
     }
 
-    // Temporary files
-    const uniqueId = crypto.randomBytes(8).toString('hex');
-    const tempAudioPath = path.join(__dirname, `../uploads/audio_${uniqueId}.mp3`);
-    const tempSubDir = path.join(__dirname, `../uploads`);
-    const baseSubName = `sub_${uniqueId}`;
+    const videoId = extractYoutubeId(youtubeUrl);
+    let audioUrl = '';
+    let thumbnailUrl = videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : '';
+    let lyricsDataUrl = null;
 
-    // 1. Download audio and auto-generated subs (vtt) using youtube-dl-exec
-    // We request bestaudio, extract audio to mp3, and write auto subs
+    // Process uploaded thumbnail file if provided
+    const thumbnailFile = req.file || (req.files && req.files['thumbnail'] ? req.files['thumbnail'][0] : null);
+    if (thumbnailFile) {
+      const thumbRes = await uploadToCloudinary(thumbnailFile, 'aashram_audio', { resourceType: 'image' });
+      if (thumbRes) thumbnailUrl = thumbRes.url;
+    }
+
+    // Try downloading audio via yt-dlp if available
+    let downloadedAudio = false;
     try {
+      const uniqueId = crypto.randomBytes(8).toString('hex');
+      const tempAudioPath = path.join(__dirname, `../uploads/audio_${uniqueId}.mp3`);
+      const tempSubDir = path.join(__dirname, `../uploads`);
+      
       await youtubedl(youtubeUrl, {
         extractAudio: true,
         audioFormat: 'mp3',
         output: tempAudioPath
       });
-    } catch (err) {
-      console.warn("yt-dlp threw an error (likely subtitles rate limit or missing ffmpeg). Checking if audio was still created...");
-    }
 
-    // Find the actual audio file created (could be .webm if ffmpeg is missing)
-    const allFiles = fs.readdirSync(tempSubDir);
-    const actualAudioFile = allFiles.find(f => f.startsWith(`audio_${uniqueId}`) && !f.endsWith('.vtt'));
-    if (!actualAudioFile) {
-      throw new Error("Failed to download audio file from YouTube.");
-    }
-    const actualAudioPath = path.join(tempSubDir, actualAudioFile);
-
-    // 2. Upload Audio to Cloudinary
-    const audioUrl = await uploadToCloudinary(actualAudioPath, 'video');
-
-    // 3. Find the downloaded .vtt file
-    // youtube-dl saves subs as `outputName.lang.vtt`. Since output is tempAudioPath,
-    // it will be something like `audio_xxxx.en.vtt`
-    const vttFile = allFiles.find(f => f.startsWith(`audio_${uniqueId}`) && f.endsWith('.vtt'));
-    
-    let lyricsDataUrl = '';
-    if (vttFile) {
-      const vttPath = path.join(tempSubDir, vttFile);
-      lyricsDataUrl = await uploadToCloudinary(vttPath, 'raw');
-      if (lyricsDataUrl.startsWith('http')) {
-        try { fs.unlinkSync(vttPath); } catch (e) {}
-      }
-    } else {
-      // Fallback: Generate Lyrics using Deepgram API
-      try {
-        if (process.env.DEEPGRAM_API_KEY) {
-          console.log("No YouTube subtitles found. Falling back to Deepgram...");
-          const vttContent = await generateVTTFromUrl(audioUrl, language || 'Marathi');
-          const vttPath = path.join(tempSubDir, `deepgram-lyrics-${Date.now()}.vtt`);
-          fs.writeFileSync(vttPath, vttContent);
-          lyricsDataUrl = await uploadToCloudinary(vttPath, 'raw');
-          if (lyricsDataUrl.startsWith('http')) {
-            try { fs.unlinkSync(vttPath); } catch (e) {}
-          }
+      const allFiles = fs.readdirSync(tempSubDir);
+      const actualAudioFile = allFiles.find(f => f.startsWith(`audio_${uniqueId}`) && !f.endsWith('.vtt'));
+      if (actualAudioFile) {
+        const actualAudioPath = path.join(tempSubDir, actualAudioFile);
+        const uploadRes = await uploadToCloudinary(actualAudioPath, 'aashram_audio', { resourceType: 'video' });
+        if (uploadRes) {
+          audioUrl = uploadRes.url;
+          downloadedAudio = true;
         }
-      } catch (err) {
-        console.error("Deepgram transcription error:", err.message);
+      }
+    } catch (err) {
+      console.warn("yt-dlp download failed on server. Falling back to YouTube direct URL:", err.message);
+    }
+
+    // Fallback if yt-dlp download was not possible (e.g. Render server environment without yt-dlp)
+    if (!downloadedAudio) {
+      if (videoId) {
+        audioUrl = `https://www.youtube.com/watch?v=${videoId}`;
+      } else {
+        audioUrl = youtubeUrl;
       }
     }
 
-    // Clean up audio if uploaded to Cloudinary
-    if (audioUrl.startsWith('http') && fs.existsSync(actualAudioPath)) {
-      fs.unlinkSync(actualAudioPath);
-    }
-
-    const thumbnailFile = req.file;
-    let thumbnailUrl = '';
-    if (thumbnailFile) {
-      thumbnailUrl = await uploadToCloudinary(thumbnailFile.path, 'image');
-      if (thumbnailUrl.startsWith('http')) {
-        try { fs.unlinkSync(thumbnailFile.path); } catch (e) {}
-      }
-    }
-
-    // 4. Save to DB
     const audioTrack = await AudioTrack.create({
-      title: title || 'YouTube Import',
+      title: title || (videoId ? `YouTube Track (${videoId})` : 'YouTube Import'),
       audioUrl,
       thumbnailUrl,
       lyricsDataUrl,
@@ -129,7 +82,7 @@ exports.importFromYoutube = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: lyricsDataUrl ? 'Audio and lyrics imported successfully' : 'Audio imported successfully.',
+      message: 'Audio imported successfully.',
       data: audioTrack
     });
 
@@ -150,45 +103,19 @@ exports.uploadDirect = async (req, res) => {
     const audioFile = req.files['audioFile'][0];
     const thumbnailFile = req.files['thumbnail'] ? req.files['thumbnail'][0] : null;
 
-    const audioUrl = await uploadToCloudinary(audioFile.path, 'auto');
+    const uploadRes = await uploadToCloudinary(audioFile, 'aashram_audio', { resourceType: 'auto' });
+    const audioUrl = uploadRes ? uploadRes.url : '';
     let thumbnailUrl = '';
     if (thumbnailFile) {
-      thumbnailUrl = await uploadToCloudinary(thumbnailFile.path, 'image');
-    }
-    
-    // Clean up local files safely if they were uploaded to Cloudinary
-    try {
-      if (audioUrl.startsWith('http') && fs.existsSync(audioFile.path)) fs.unlinkSync(audioFile.path);
-      if (thumbnailFile && thumbnailUrl.startsWith('http') && fs.existsSync(thumbnailFile.path)) fs.unlinkSync(thumbnailFile.path);
-    } catch (err) {
-      console.warn("Failed to clean up local files:", err.message);
-    }
-
-    // Generate Lyrics using Deepgram API
-    let lyricsDataUrl = null;
-    try {
-      if (process.env.DEEPGRAM_API_KEY) {
-        const vttContent = await generateVTTFromUrl(audioUrl, language || 'Marathi');
-        if (vttContent) {
-            const vttPath = path.join(__dirname, '../uploads', `lyrics-${Date.now()}.vtt`);
-            fs.writeFileSync(vttPath, vttContent);
-            lyricsDataUrl = await uploadToCloudinary(vttPath, 'raw');
-            if (lyricsDataUrl.startsWith('http')) {
-                try { fs.unlinkSync(vttPath); } catch (e) {}
-            }
-        }
-      } else {
-        console.warn("DEEPGRAM_API_KEY missing, skipping transcription.");
-      }
-    } catch (err) {
-      console.error("Deepgram transcription error:", err.message);
+      const thumbRes = await uploadToCloudinary(thumbnailFile, 'aashram_audio', { resourceType: 'image' });
+      if (thumbRes) thumbnailUrl = thumbRes.url;
     }
 
     const audioTrack = await AudioTrack.create({
       title: title || 'Direct Upload',
       audioUrl,
       thumbnailUrl,
-      lyricsDataUrl,
+      lyricsDataUrl: null,
       language: language || 'Marathi',
       sourceType: 'direct_upload',
       uploadedBy: req.user?._id || undefined,
@@ -197,7 +124,7 @@ exports.uploadDirect = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: lyricsDataUrl ? 'Audio and lyrics uploaded successfully!' : 'Audio uploaded successfully.',
+      message: 'Audio uploaded successfully.',
       data: audioTrack
     });
   } catch (error) {
@@ -230,7 +157,7 @@ exports.setActiveTrack = async (req, res) => {
     if (!track) return res.status(404).json({ message: 'Track not found' });
 
     track.isActive = !track.isActive;
-    await track.save(); // pre-save hook handles deactivating others
+    await track.save();
 
     res.status(200).json({ 
         success: true, 
@@ -252,12 +179,10 @@ exports.updateTrack = async (req, res) => {
     if (title) track.title = title;
     if (language) track.language = language;
 
-    if (req.file) {
-      const thumbnailUrl = await uploadToCloudinary(req.file.path, 'image');
-      track.thumbnailUrl = thumbnailUrl;
-      if (thumbnailUrl.startsWith('http')) {
-        try { fs.unlinkSync(req.file.path); } catch (e) {}
-      }
+    if (req.file || (req.files && req.files['thumbnail'])) {
+      const thumbFile = req.file || req.files['thumbnail'][0];
+      const thumbRes = await uploadToCloudinary(thumbFile, 'aashram_audio', { resourceType: 'image' });
+      if (thumbRes) track.thumbnailUrl = thumbRes.url;
     }
 
     await track.save();
