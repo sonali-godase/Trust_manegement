@@ -291,6 +291,7 @@ const Accountants = () => {
                     <input 
                       required
                       type="text" 
+                      autoComplete="name"
                       pattern="[A-Za-z\s]+"
                       title="Name must contain only alphabets and spaces"
                       value={formData.fullName} 
@@ -306,6 +307,7 @@ const Accountants = () => {
                     <div className="flex gap-2">
                       <input 
                         type="email" 
+                        autoComplete="username"
                         value={formData.email} 
                         onChange={e => setFormData({...formData, email: e.target.value})}
                         disabled={modalMode !== 'add' || otpVerified}
@@ -355,6 +357,7 @@ const Accountants = () => {
                     <input 
                       required
                       type="tel" 
+                      autoComplete="tel"
                       pattern="\d{10}"
                       title="Mobile number must be exactly 10 digits"
                       maxLength={10}
@@ -395,6 +398,7 @@ const Accountants = () => {
                         <input 
                           required
                           type="password" 
+                          autoComplete="new-password"
                           pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}"
                           title="Password must be at least 8 chars long with 1 uppercase, 1 lowercase, 1 number, and 1 special character"
                           value={formData.password} 
@@ -406,6 +410,7 @@ const Accountants = () => {
                         <label className="block text-sm font-semibold text-gray-700 mb-1">Confirm Password *</label>
                         <input 
                           type="password" 
+                          autoComplete="new-password"
                           value={formData.confirmPassword} 
                           onChange={e => setFormData({...formData, confirmPassword: e.target.value})}
                           className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none" 

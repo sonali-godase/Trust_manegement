@@ -179,6 +179,7 @@ export const Settings = () => {
                 <input
                   type="text"
                   name="name"
+                  autoComplete="name"
                   pattern="[A-Za-z\s]+"
                   title="Name must contain only alphabets and spaces"
                   value={formData.name}
@@ -198,6 +199,7 @@ export const Settings = () => {
                 <input
                   type="email"
                   name="email"
+                  autoComplete="username"
                   value={formData.email}
                   disabled
                   onChange={handleInputChange}
@@ -216,6 +218,7 @@ export const Settings = () => {
                 <input
                   type="tel"
                   name="mobile"
+                  autoComplete="tel"
                   pattern="\d{10}"
                   title="Mobile number must be exactly 10 digits"
                   maxLength={10}

@@ -179,7 +179,7 @@ exports.generateShakhaPavtiPdf = async (rawDonation) => {
     });
 
     await page.close();
-    return pdfBuffer;
+    return Buffer.from(pdfBuffer);
   } catch (err) {
     console.error("Error generating shakha pavti PDF:", err);
     throw err;

@@ -169,6 +169,7 @@ const Register = () => {
                   type="email" 
                   name="email"
                   placeholder="Email Address"
+                  autoComplete="username"
                   value={formData.email}
                   onChange={handleInputChange}
                   className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-saffron-400 focus:ring-2 focus:ring-saffron-100 outline-none transition-all text-caramel-deep placeholder-gray-400 shadow-sm"
@@ -184,6 +185,7 @@ const Register = () => {
                   type="tel" 
                   name="phone"
                   placeholder="Mobile Number (e.g. 9876543210)"
+                  autoComplete="tel"
                   value={formData.phone}
                   onChange={handleInputChange}
                   className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-saffron-400 focus:ring-2 focus:ring-saffron-100 outline-none transition-all text-caramel-deep placeholder-gray-400 shadow-sm"
@@ -199,6 +201,7 @@ const Register = () => {
                   type={showPassword ? "text" : "password"} 
                   name="password"
                   placeholder="Password"
+                  autoComplete="new-password"
                   value={formData.password}
                   onChange={handleInputChange}
                   className="w-full pl-11 pr-12 py-3 bg-white border border-gray-200 rounded-xl focus:border-saffron-400 focus:ring-2 focus:ring-saffron-100 outline-none transition-all text-caramel-deep placeholder-gray-400 shadow-sm"
@@ -221,6 +224,7 @@ const Register = () => {
                   type={showConfirmPassword ? "text" : "password"} 
                   name="confirmPassword"
                   placeholder="Confirm Password"
+                  autoComplete="new-password"
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
                   className="w-full pl-11 pr-12 py-3 bg-white border border-gray-200 rounded-xl focus:border-saffron-400 focus:ring-2 focus:ring-saffron-100 outline-none transition-all text-caramel-deep placeholder-gray-400 shadow-sm"

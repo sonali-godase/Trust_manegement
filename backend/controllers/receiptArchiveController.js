@@ -132,13 +132,17 @@ exports.getReceipts = async (req, res) => {
         if (effectiveCategory === "Jama Pavti") donationQuery.donationType = "jama_pavti";
         if (effectiveCategory === "Dengi Pavti") donationQuery.donationType = "dengi_pavti";
         if (effectiveCategory === "Branch Pavti") donationQuery.donationType = "shakha_pavti";
-      } else if (effectiveCategory.$in) {
+      } else if (effectiveCategory && effectiveCategory.$in) {
         const dTypes = [];
         if (effectiveCategory.$in.includes("Jama Pavti")) dTypes.push("jama_pavti");
         if (effectiveCategory.$in.includes("Dengi Pavti")) dTypes.push("dengi_pavti");
         if (effectiveCategory.$in.includes("Branch Pavti")) dTypes.push("shakha_pavti");
         if (dTypes.length > 0 && !effectiveCategory.$in.includes("Donation")) {
-           donationQuery.donationType = { $in: dTypes };
+           donationQuery.$or = [
+             { donationType: { $in: dTypes } },
+             { donationType: { $exists: false } },
+             { donationType: null }
+           ];
         }
       }
       
@@ -172,17 +176,18 @@ exports.getReceipts = async (req, res) => {
           receiptNumber: d.receiptNumber,
           category: cat,
           branchId: d.branchId,
-        generatedBy: d.approvedBy,
-        createdAt: d.createdAt,
-        approvalDate: d.approvalDate,
-        lastReceiptDownloadedAt: d.lastReceiptDownloadedAt,
-        pdfUrl: `/api/donations/${d._id}/receipt`,
-        dynamicData: {
-          donorName: d.donorName,
-          amount: d.amount,
-          donationReference: d.donationReference
-        }
-      };
+          generatedBy: d.approvedBy,
+          createdAt: d.createdAt,
+          approvalDate: d.approvalDate,
+          lastReceiptDownloadedAt: d.lastReceiptDownloadedAt,
+          pdfUrl: d.receiptPdfUrl || `/api/donations/${d._id}/receipt`,
+          dynamicData: {
+            donorName: d.donorName,
+            amount: d.amount,
+            donationReference: d.donationReference,
+            donationType: d.donationType
+          }
+        };
     });
 
       mergedReceipts = [...mergedReceipts, ...mappedDonations];

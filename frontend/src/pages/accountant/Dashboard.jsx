@@ -60,14 +60,26 @@ const Dashboard = () => {
           if (d.status === 'REJECTED') rejected++;
         });
 
-        setStats({
-          total: fullList.length,
-          uniqueDonors: uniqueDonorsSet.size,
-          pending,
-          approved,
-          rejected,
-          amount
-        });
+        if (statsRes?.data?.success && statsRes.data.data) {
+          const s = statsRes.data.data;
+          setStats({
+            total: s.totalDonations !== undefined ? s.totalDonations : fullList.length,
+            uniqueDonors: uniqueDonorsSet.size,
+            pending: s.pendingVerification !== undefined ? s.pendingVerification : pending,
+            approved: s.approvedDonations !== undefined ? s.approvedDonations : approved,
+            rejected: s.rejectedDonations !== undefined ? s.rejectedDonations : rejected,
+            amount: s.totalCollection !== undefined ? s.totalCollection : amount
+          });
+        } else {
+          setStats({
+            total: fullList.length,
+            uniqueDonors: uniqueDonorsSet.size,
+            pending,
+            approved,
+            rejected,
+            amount
+          });
+        }
 
         setRecentDonations(fullList.slice(0, 5));
 

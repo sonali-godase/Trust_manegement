@@ -26,8 +26,27 @@ const uploadToCloudinary = async (fileInput, folder = "uploads", options = {}) =
       resource_type: resourceType
     };
 
-    // Case 1: Multer file object or object with .buffer or raw Buffer or .path
-    const buffer = Buffer.isBuffer(fileInput) ? fileInput : (fileInput?.buffer || (fileInput?.path && fs.existsSync(fileInput.path) ? fs.readFileSync(fileInput.path) : null));
+    // Case 1: Convert fileInput, fileInput.buffer, Uint8Array, or ArrayBuffer into a valid Node Buffer
+    let buffer = null;
+    if (Buffer.isBuffer(fileInput)) {
+      buffer = fileInput;
+    } else if (fileInput instanceof Uint8Array || ArrayBuffer.isView(fileInput)) {
+      buffer = Buffer.from(fileInput.buffer, fileInput.byteOffset, fileInput.byteLength);
+    } else if (fileInput instanceof ArrayBuffer) {
+      buffer = Buffer.from(fileInput);
+    } else if (fileInput?.buffer) {
+      if (Buffer.isBuffer(fileInput.buffer)) {
+        buffer = fileInput.buffer;
+      } else if (fileInput.buffer instanceof Uint8Array || ArrayBuffer.isView(fileInput.buffer)) {
+        buffer = Buffer.from(fileInput.buffer.buffer, fileInput.buffer.byteOffset, fileInput.buffer.byteLength);
+      } else if (fileInput.buffer instanceof ArrayBuffer) {
+        buffer = Buffer.from(fileInput.buffer);
+      }
+    } else if (typeof fileInput === "string" && fs.existsSync(fileInput)) {
+      buffer = fs.readFileSync(fileInput);
+    } else if (fileInput?.path && fs.existsSync(fileInput.path)) {
+      buffer = fs.readFileSync(fileInput.path);
+    }
 
     if (buffer) {
       return new Promise((resolve) => {

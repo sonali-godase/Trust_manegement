@@ -119,20 +119,12 @@ exports.generateDengiPavtiPdf = async (rawDonation) => {
       return '';
     };
 
-    const swamijiPath1 = path.join(__dirname, '../../frontend/src/assets/kolekar_SP_1.jpeg');
-    const swamijiPath2 = path.join(__dirname, '../../frontend/src/assets/kolekar_SP_2.jpeg');
-    const swamijiImage1 = encodeImage(swamijiPath1);
-    let swamijiImage2 = encodeImage(swamijiPath2);
-    if (!swamijiImage2) swamijiImage2 = swamijiImage1;
-
     htmlContent = htmlContent.replace(/{{receiptNumber}}/g, receiptNo);
     htmlContent = htmlContent.replace(/{{date}}/g, dateStr);
     htmlContent = htmlContent.replace(/{{donorName}}/g, bilingualName);
     htmlContent = htmlContent.replace(/{{address}}/g, bilingualAddress);
     htmlContent = htmlContent.replace(/{{amountInWords}}/g, bilingualAmountWords);
     htmlContent = htmlContent.replace(/{{amount}}/g, amount);
-    htmlContent = htmlContent.replace(/{{swamijiImage1}}/g, swamijiImage1);
-    htmlContent = htmlContent.replace(/{{swamijiImage2}}/g, swamijiImage2);
 
     const browser = await getBrowser();
     
@@ -150,7 +142,7 @@ exports.generateDengiPavtiPdf = async (rawDonation) => {
     });
 
     await page.close();
-    return pdfBuffer;
+    return Buffer.from(pdfBuffer);
   } catch (err) {
     console.error("Error generating dengi pavti PDF:", err);
     throw err;

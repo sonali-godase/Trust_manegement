@@ -112,6 +112,18 @@ const donationSchema = new mongoose.Schema({
   lastReceiptDownloadedAt: {
     type: Date,
     required: false
+  },
+  receiptPublicId: {
+    type: String,
+    required: false
+  },
+  receiptGeneratedAt: {
+    type: Date,
+    required: false
+  },
+  versionNumber: {
+    type: Number,
+    default: 1
   }
 }, { timestamps: true });
 

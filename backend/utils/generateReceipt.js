@@ -132,17 +132,26 @@ exports.generateReceiptPdf = (rawDonation) => {
       // Clone the object to prevent saving Marathi translated values to the database
       const donation = typeof rawDonation.toObject === 'function' ? rawDonation.toObject() : { ...rawDonation };
 
+      const toBuffer = (buf) => {
+        if (!buf) return buf;
+        if (Buffer.isBuffer(buf)) return buf;
+        if (buf instanceof Uint8Array || ArrayBuffer.isView(buf)) return Buffer.from(buf.buffer, buf.byteOffset, buf.byteLength);
+        if (buf instanceof ArrayBuffer) return Buffer.from(buf);
+        if (buf?.buffer) return Buffer.from(buf.buffer);
+        return Buffer.from(buf);
+      };
+
       if (donation.donationType === "dengi_pavti" || !donation.donationType) {
         try {
-          const pdfBuffer = await generateDengiPavtiPdf(donation);
-          return resolve(pdfBuffer);
+          const rawBuf = await generateDengiPavtiPdf(donation);
+          return resolve(toBuffer(rawBuf));
         } catch (e) {
           return reject(e);
         }
       } else if (donation.donationType === "shakha_pavti") {
         try {
-          const pdfBuffer = await generateShakhaPavtiPdf(donation);
-          return resolve(pdfBuffer);
+          const rawBuf = await generateShakhaPavtiPdf(donation);
+          return resolve(toBuffer(rawBuf));
         } catch (e) {
           return reject(e);
         }

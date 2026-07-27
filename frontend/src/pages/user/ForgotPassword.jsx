@@ -113,6 +113,7 @@ const ForgotPassword = () => {
                 <input 
                   type="email" 
                   placeholder="Registered Email Address"
+                  autoComplete="username"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-11 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl focus:border-saffron-400 focus:ring-2 focus:ring-saffron-100 outline-none transition-all text-caramel-deep placeholder-gray-400 shadow-sm font-medium"
@@ -154,6 +155,7 @@ const ForgotPassword = () => {
                     pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}" 
                     title="Password must be at least 8 chars long with 1 uppercase, 1 lowercase, 1 number, and 1 special character"
                     placeholder="New Password"
+                    autoComplete="new-password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="w-full pl-11 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl focus:border-saffron-400 focus:ring-2 focus:ring-saffron-100 outline-none transition-all text-caramel-deep placeholder-gray-400 shadow-sm font-medium"
@@ -167,6 +169,7 @@ const ForgotPassword = () => {
                 <input 
                   type="password" 
                   placeholder="Confirm New Password"
+                  autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className="w-full pl-11 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl focus:border-saffron-400 focus:ring-2 focus:ring-saffron-100 outline-none transition-all text-caramel-deep placeholder-gray-400 shadow-sm font-medium"

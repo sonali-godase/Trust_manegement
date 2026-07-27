@@ -1,5 +1,6 @@
 const Donation = require("../models/Donation");
 const Branch = require("../models/Branch");
+const mongoose = require("mongoose");
 const cloudinary = require("../config/cloudinary");
 const { uploadToCloudinary, deleteFromCloudinary, extractPublicId } = require("../utils/cloudinaryHelper");
 const fs = require("fs");
@@ -331,6 +332,10 @@ exports.approveDonation = async (req, res) => {
     const { id } = req.params;
     const { remarks } = req.body;
 
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid donation ID format." });
+    }
+
     const donation = await Donation.findById(id);
     if (!donation) return res.status(404).json({ success: false, message: "Donation not found" });
 
@@ -340,23 +345,84 @@ exports.approveDonation = async (req, res) => {
 
     donation.status = "APPROVED";
     donation.approvedBy = req.user._id;
-    donation.approvedByModel = req.user.role; // e.g., 'Admin' or 'BranchManager'
+    donation.approvedByModel = req.user.role || 'Accountant';
     donation.approvalDate = new Date();
     donation.approvalRemarks = remarks;
-    
-    let pdfUrl = `/api/donations/${donation._id}/receipt`;
-    donation.receiptNumber = donation.donationReference;
-    donation.receiptPdfUrl = pdfUrl;
-    
+    if (!donation.receiptNumber) {
+      donation.receiptNumber = await generateReceiptRef(donation.donationType);
+    }
+
+    // Single-source generation: generate PDF & upload to Cloudinary
+    let pdfBuffer;
+    try {
+      const rawBuf = await generateReceiptPdf(donation.toObject ? donation.toObject() : donation);
+      if (rawBuf) {
+        if (Buffer.isBuffer(rawBuf)) pdfBuffer = rawBuf;
+        else if (rawBuf instanceof Uint8Array || ArrayBuffer.isView(rawBuf)) pdfBuffer = Buffer.from(rawBuf.buffer, rawBuf.byteOffset, rawBuf.byteLength);
+        else if (rawBuf instanceof ArrayBuffer) pdfBuffer = Buffer.from(rawBuf);
+        else if (rawBuf?.buffer) pdfBuffer = Buffer.from(rawBuf.buffer);
+        else pdfBuffer = Buffer.from(rawBuf);
+      }
+    } catch (genErr) {
+      console.error("PDF generation failed on approval:", genErr);
+      return res.status(500).json({ success: false, message: "Failed to generate receipt PDF.", error: genErr.message });
+    }
+
+    let uploadRes = null;
+    if (pdfBuffer) {
+      uploadRes = await uploadToCloudinary(pdfBuffer, "receipts", { resourceType: "auto" });
+    }
+
+    if (uploadRes && uploadRes.url) {
+      donation.receiptPdfUrl = uploadRes.url;
+      donation.receiptPublicId = uploadRes.publicId;
+    } else {
+      donation.receiptPdfUrl = `/api/donations/${donation._id}/receipt`;
+    }
+    donation.receiptGeneratedAt = new Date();
+    donation.versionNumber = 1;
+
     await donation.save();
 
+    // Also sync/issue to ReceiptArchive for unified tracking
     try {
-      if (donation.email && pdfUrl) {
-        const pdfBuffer = await generateReceiptPdf(donation.toObject());
+      const ReceiptArchive = require('../models/ReceiptArchive');
+      let cat = "Dengi Pavti";
+      if (donation.donationType === "jama_pavti") cat = "Jama Pavti";
+      if (donation.donationType === "shakha_pavti") cat = "Branch Pavti";
+
+      await ReceiptArchive.findOneAndUpdate(
+        { receiptNumber: donation.receiptNumber },
+        {
+          receiptNumber: donation.receiptNumber,
+          category: cat,
+          branchId: donation.branchId,
+          referenceId: donation._id,
+          referenceModel: 'Donation',
+          dynamicData: {
+            donorName: donation.donorName,
+            amount: donation.amount,
+            donationReference: donation.donationReference,
+            donationType: donation.donationType
+          },
+          pdfUrl: donation.receiptPdfUrl,
+          status: 'Generated',
+          generatedBy: req.user._id,
+          generatedByModel: req.user.role || 'Accountant'
+        },
+        { upsert: true, new: true }
+      ).catch(e => console.warn("ReceiptArchive sync warning:", e.message));
+    } catch (archiveErr) {
+      console.warn("ReceiptArchive lookup error:", archiveErr.message);
+    }
+
+    // Email notification
+    try {
+      if (donation.email && pdfBuffer) {
         await sendEmail({
           email: donation.email,
           subject: "Your Donation Receipt - Kolekar Maha Swamiji Monastery",
-          message: `Dear ${donation.donorName},\n\nWe sincerely thank you for your generous donation of INR ${donation.amount}/-. Your payment has been successfully verified and approved.\n\nPlease find your official donation receipt attached to this email.\n\nYou can also download it from our portal here: ${pdfUrl}\n\nMay the divine blessings of Kolekar Maha Swamiji be always with you and your family.\n\nRegards,\nShri Gurumurti Rudrapashupati Lingayat Monastery Trust`,
+          message: `Dear ${donation.donorName},\n\nWe sincerely thank you for your generous donation of INR ${donation.amount}/-. Your payment has been successfully verified and approved.\n\nPlease find your official donation receipt attached to this email.\n\nYou can also download it anytime from our portal: ${donation.receiptPdfUrl}\n\nMay the divine blessings of Kolekar Maha Swamiji be always with you and your family.\n\nRegards,\nShri Gurumurti Rudrapashupati Lingayat Monastery Trust`,
           attachments: [
             {
               filename: `Donation_Receipt_${donation.receiptNumber || donation.donationReference}.pdf`,
@@ -370,9 +436,15 @@ exports.approveDonation = async (req, res) => {
       console.error("Error sending approval email:", emailError);
     }
 
-    res.status(200).json({ success: true, message: "Donation approved successfully.", data: donation, pdfUrl: pdfUrl });
+    return res.status(200).json({
+      success: true,
+      message: "Donation approved successfully and receipt stored.",
+      data: donation,
+      pdfUrl: donation.receiptPdfUrl
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Approve donation error:", error);
+    return res.status(500).json({ success: false, message: error.message || "Approval process failed." });
   }
 };
 
@@ -383,6 +455,10 @@ exports.rejectDonation = async (req, res) => {
 
     if (!reason) {
       return res.status(400).json({ success: false, message: "Rejection reason is required." });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid donation ID format." });
     }
 
     const donation = await Donation.findById(id);
@@ -488,24 +564,48 @@ exports.verifyReceipt = async (req, res) => {
 exports.downloadReceipt = async (req, res) => {
   try {
     const { id } = req.params;
-    let donation = await Donation.findById(id);
+
+    if (!id || id === 'undefined' || id === 'null') {
+      return res.status(400).json({ success: false, message: "Receipt or donation ID is required." });
+    }
+
+    const isValidId = mongoose.Types.ObjectId.isValid(id);
+    let donation = null;
+
+    if (isValidId) {
+      donation = await Donation.findById(id);
+    } else {
+      donation = await Donation.findOne({ $or: [{ receiptNumber: id }, { donationReference: id }] });
+    }
 
     // If not found in Donation model, check ReceiptArchive model
     if (!donation) {
       try {
         const ReceiptArchive = require('../models/ReceiptArchive');
-        const archive = await ReceiptArchive.findById(id);
+        let archive = null;
+        if (isValidId) {
+          archive = await ReceiptArchive.findById(id);
+        } else {
+          archive = await ReceiptArchive.findOne({ receiptNumber: id });
+        }
+
         if (archive) {
-          donation = {
-            _id: archive._id,
-            receiptNumber: archive.receiptNumber,
-            donorName: archive.dynamicData?.donorName || archive.dynamicData?.name || archive.dynamicData?.subject || 'Devotee',
-            amount: archive.dynamicData?.amount || 0,
-            date: archive.createdAt,
-            category: archive.category,
-            donationType: archive.category?.toLowerCase().includes('jama') ? 'jama_pavti' : (archive.category?.toLowerCase().includes('shakha') ? 'shakha_pavti' : 'dengi_pavti'),
-            status: 'APPROVED'
-          };
+          if (archive.referenceId && mongoose.Types.ObjectId.isValid(archive.referenceId)) {
+            donation = await Donation.findById(archive.referenceId);
+          }
+          if (!donation) {
+            donation = {
+              _id: archive._id,
+              receiptNumber: archive.receiptNumber,
+              donorName: archive.dynamicData?.donorName || archive.dynamicData?.name || archive.dynamicData?.subject || 'Devotee',
+              amount: archive.dynamicData?.amount || 0,
+              date: archive.createdAt,
+              category: archive.category,
+              donationType: archive.dynamicData?.donationType || (archive.category?.toLowerCase().includes('jama') ? 'jama_pavti' : (archive.category?.toLowerCase().includes('shakha') ? 'shakha_pavti' : 'dengi_pavti')),
+              receiptPdfUrl: archive.pdfUrl,
+              status: 'APPROVED'
+            };
+          }
         }
       } catch (archiveErr) {
         console.warn("ReceiptArchive lookup error:", archiveErr.message);
@@ -513,11 +613,11 @@ exports.downloadReceipt = async (req, res) => {
     }
 
     if (!donation) {
-      return res.status(404).json({ success: false, message: "Donation record not found." });
+      return res.status(404).json({ success: false, message: "Receipt record not found." });
     }
 
     if (donation.status && donation.status !== "APPROVED" && donation.status !== "Published") {
-      donation.status = "APPROVED";
+      return res.status(404).json({ success: false, message: "Receipt has not been issued yet." });
     }
 
     // Branch Managers should only access their branch's receipts
@@ -525,20 +625,99 @@ exports.downloadReceipt = async (req, res) => {
       return res.status(403).json({ success: false, message: "Unauthorized to access this receipt." });
     }
 
-    // Update last downloaded timestamp if model instance
+    // Update last downloaded timestamp
     if (typeof donation.save === 'function') {
       donation.lastReceiptDownloadedAt = new Date();
       await donation.save().catch(e => console.warn("Timestamp save skipped:", e.message));
     }
 
-    const pdfBuffer = await generateReceiptPdf(donation);
+    // If Cloudinary URL is available, attempt to proxy fetch it to avoid 401 Unauthorized in browser
+    if (donation.receiptPdfUrl && (donation.receiptPdfUrl.startsWith('http://') || donation.receiptPdfUrl.startsWith('https://'))) {
+      if (req.query.json === 'true') {
+        return res.status(200).json({ success: true, pdfUrl: donation.receiptPdfUrl });
+      }
+
+      try {
+        const axios = require('axios');
+        const cloudResponse = await axios.get(donation.receiptPdfUrl, { responseType: 'arraybuffer' });
+        if (cloudResponse.status === 200 && cloudResponse.data) {
+          res.setHeader("Content-Type", "application/pdf");
+          res.setHeader("Content-Disposition", `inline; filename=Donation_Receipt_${donation.receiptNumber || id}.pdf`);
+          return res.send(Buffer.from(cloudResponse.data));
+        }
+      } catch (cloudFetchErr) {
+        console.warn("Direct Cloudinary PDF proxy fetch encountered issue/401, falling back to generator:", cloudFetchErr.message);
+      }
+    }
+
+    // Fallback: Generate receipt PDF dynamically based on donationType (jama_pavti, dengi_pavti, shakha_pavti)
+    const rawPdf = await generateReceiptPdf(typeof donation.toObject === 'function' ? donation.toObject() : donation);
+    const pdfBuffer = Buffer.isBuffer(rawPdf) ? rawPdf : Buffer.from(rawPdf.buffer || rawPdf);
+
+    try {
+      const uploadRes = await uploadToCloudinary(pdfBuffer, "receipts", { resourceType: "auto" });
+      if (uploadRes && uploadRes.url && typeof donation.save === 'function') {
+        donation.receiptPdfUrl = uploadRes.url;
+        donation.receiptPublicId = uploadRes.publicId;
+        donation.receiptGeneratedAt = new Date();
+        await donation.save().catch(e => console.warn("Cloudinary URL save skipped:", e.message));
+      }
+    } catch (cloudErr) {
+      console.warn("On-the-fly Cloudinary upload skipped:", cloudErr.message);
+    }
+
+    if (req.query.json === 'true') {
+      return res.status(200).json({ success: true, pdfUrl: donation.receiptPdfUrl || `/api/donations/${donation._id}/receipt` });
+    }
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename=Donation_Receipt_${donation.receiptNumber || id}.pdf`);
     return res.send(pdfBuffer);
   } catch (err) {
     console.error("[donationController][ERROR] downloadReceipt:", err);
-    return res.status(500).json({ success: false, message: "Failed to generate receipt PDF.", error: err.message });
+    return res.status(500).json({ success: false, message: "Failed to fetch or generate receipt PDF.", error: err.message });
+  }
+};
+
+exports.regenerateReceipt = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid donation ID format." });
+    }
+
+    const donation = await Donation.findById(id);
+    if (!donation) return res.status(404).json({ success: false, message: "Donation not found." });
+
+    if (donation.status !== "APPROVED") {
+      return res.status(400).json({ success: false, message: "Cannot regenerate receipt for unapproved donation." });
+    }
+
+    // Delete old Cloudinary asset if public ID present
+    if (donation.receiptPublicId) {
+      await deleteFromCloudinary(donation.receiptPublicId, "auto").catch(e => console.warn(e.message));
+    }
+
+    const pdfBuffer = await generateReceiptPdf(donation.toObject ? donation.toObject() : donation);
+    const uploadRes = await uploadToCloudinary(pdfBuffer, "receipts", { resourceType: "auto" });
+
+    if (uploadRes && uploadRes.url) {
+      donation.receiptPdfUrl = uploadRes.url;
+      donation.receiptPublicId = uploadRes.publicId;
+    }
+    donation.receiptGeneratedAt = new Date();
+    donation.versionNumber = (donation.versionNumber || 1) + 1;
+    await donation.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Receipt regenerated successfully (Version ${donation.versionNumber}).`,
+      data: donation,
+      pdfUrl: donation.receiptPdfUrl
+    });
+  } catch (error) {
+    console.error("Regenerate receipt error:", error);
+    return res.status(500).json({ success: false, message: error.message || "Failed to regenerate receipt." });
   }
 };
 

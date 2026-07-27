@@ -151,6 +151,7 @@ const Profile = () => {
               </label>
               <input 
                 type="text" required
+                autoComplete="name"
                 value={formData.fullName}
                 onChange={e => setFormData({...formData, fullName: e.target.value})}
                 className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 outline-none transition"
@@ -162,6 +163,7 @@ const Profile = () => {
               </label>
               <input 
                 type="text" required
+                autoComplete="tel"
                 value={formData.phone}
                 onChange={e => setFormData({...formData, phone: e.target.value})}
                 className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 outline-none transition"
@@ -189,6 +191,7 @@ const Profile = () => {
               </label>
               <input 
                 type="email" disabled
+                autoComplete="username"
                 value={user?.email || ''}
                 className="w-full border border-gray-200 bg-gray-50 text-gray-500 rounded-lg p-3 outline-none cursor-not-allowed"
               />
@@ -210,6 +213,7 @@ const Profile = () => {
               <div className="relative">
                 <input 
                   type="password" disabled
+                  autoComplete="current-password"
                   value="****************"
                   className="w-full border border-gray-200 bg-gray-50 text-gray-500 rounded-lg p-3 outline-none cursor-not-allowed"
                 />

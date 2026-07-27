@@ -221,6 +221,12 @@ exports.getDashboardStats = async (req, res) => {
 exports.downloadReceipt = async (req, res) => {
   try {
     const { id } = req.params;
+
+    const mongoose = require("mongoose");
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid donation ID format." });
+    }
+
     const donation = await Donation.findById(id);
 
     if (!donation) {
@@ -237,14 +243,44 @@ exports.downloadReceipt = async (req, res) => {
       return res.status(403).json({ success: false, message: "Unauthorized to access this receipt." });
     }
 
+    if (donation.status !== "APPROVED") {
+      return res.status(404).json({ success: false, message: "Receipt is only available after donation approval." });
+    }
+
+    // Return or redirect to stored Cloudinary PDF URL if available
+    if (donation.receiptPdfUrl && (donation.receiptPdfUrl.startsWith('http://') || donation.receiptPdfUrl.startsWith('https://'))) {
+      if (req.query.json === 'true') {
+        return res.status(200).json({ success: true, pdfUrl: donation.receiptPdfUrl });
+      }
+      return res.redirect(donation.receiptPdfUrl);
+    }
+
+    // Otherwise generate once, upload to Cloudinary, save URL, and return/redirect
     const pdfBuffer = await generateReceiptPdf(donation.toObject());
+    const uploadRes = await uploadToCloudinary(pdfBuffer, "receipts", { resourceType: "auto" });
+
+    if (uploadRes && uploadRes.url) {
+      donation.receiptPdfUrl = uploadRes.url;
+      donation.receiptPublicId = uploadRes.publicId;
+      donation.receiptGeneratedAt = new Date();
+      await donation.save().catch(e => console.warn("Saved Cloudinary URL warning:", e.message));
+
+      if (req.query.json === 'true') {
+        return res.status(200).json({ success: true, pdfUrl: uploadRes.url });
+      }
+      return res.redirect(uploadRes.url);
+    }
+
+    if (req.query.json === 'true') {
+      return res.status(200).json({ success: true, pdfUrl: `/api/donations/${donation._id}/receipt` });
+    }
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=receipt_${id}.pdf`);
     return res.send(pdfBuffer);
   } catch (err) {
     console.error("[userDashboard][ERROR] downloadReceipt:", err.message);
-    return res.status(500).json({ success: false, message: "Failed to generate receipt PDF." });
+    return res.status(500).json({ success: false, message: "Failed to fetch or generate receipt PDF." });
   }
 };
 

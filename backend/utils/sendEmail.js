@@ -19,6 +19,26 @@ const sendEmail = async (options) => {
       }
     });
 
+    let sanitizedAttachments = options.attachments;
+    if (sanitizedAttachments && Array.isArray(sanitizedAttachments)) {
+      sanitizedAttachments = sanitizedAttachments.map(att => {
+        if (att.content) {
+          let buf = null;
+          if (Buffer.isBuffer(att.content)) {
+            buf = att.content;
+          } else if (att.content instanceof Uint8Array || ArrayBuffer.isView(att.content)) {
+            buf = Buffer.from(att.content.buffer, att.content.byteOffset, att.content.byteLength);
+          } else if (att.content instanceof ArrayBuffer) {
+            buf = Buffer.from(att.content);
+          } else if (att.content?.buffer) {
+            buf = Buffer.from(att.content.buffer);
+          }
+          return { ...att, content: buf || att.content };
+        }
+        return att;
+      });
+    }
+
     const mailOptions = {
       from: options.from || `Kolekar Maha Swamiji Monastery, Kole <${process.env.EMAIL_USER}>`,
       to: options.email,
@@ -26,7 +46,7 @@ const sendEmail = async (options) => {
       subject: options.subject,
       text: options.message,
       html: options.html,
-      attachments: options.attachments
+      attachments: sanitizedAttachments
     };
 
     const info = await transporter.sendMail(mailOptions);

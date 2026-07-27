@@ -21,6 +21,15 @@ router.post("/:id/payment", upload.single("screenshot"), donationController.subm
 // The following routes require authentication
 router.use(authMiddleware);
 
+// Get all donations (Accessible to Admin, Trustee, Accountant, BranchManager, etc.)
+router.get("/", donationController.getAllDonations);
+
+// Get pending donations
+router.get("/pending", donationController.getPendingDonations);
+
+// Get dashboard stats
+router.get("/stats", donationController.getDashboardStats);
+
 // Get receipt PDF (Accessible to all authenticated roles)
 router.get("/:id/receipt", donationController.downloadReceipt);
 
@@ -28,6 +37,9 @@ router.use(checkPermission('Donations'));
 
 // Approve donation
 router.post("/:id/approve", donationController.approveDonation);
+
+// Regenerate receipt
+router.post("/:id/regenerate-receipt", donationController.regenerateReceipt);
 
 // Reject donation
 router.post("/:id/reject", donationController.rejectDonation);
