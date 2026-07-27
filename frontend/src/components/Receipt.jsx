@@ -218,6 +218,86 @@ const Receipt = ({ donation, isUserSide = true }) => {
     setLang(lang === 'mr' ? 'en' : 'mr');
   };
 
+  const isDengi = !isJama && !isShakha;
+
+  if (isDengi) {
+    return (
+      <div style={{ position: 'relative' }}>
+        <button 
+          onClick={toggleLanguage}
+          style={{
+            position: 'absolute',
+            top: '-40px',
+            right: '0',
+            padding: '6px 12px',
+            backgroundColor: '#be1e4d',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontFamily: "'Noto Sans Devanagari', sans-serif",
+            fontWeight: 'bold',
+            zIndex: 10
+          }}
+        >
+          {lang === 'mr' ? 'English Receipt' : 'मराठी पावती'}
+        </button>
+
+        <div id="receipt-content" className="dengi-receipt-container">
+          <div className="dengi-receipt-inner">
+            <div className="dengi-header">
+              <div className="dengi-mantra">।। ॐ नमः शिवाय ।। ।। गुरुनिर्वाण प्रसाद ।।</div>
+              <div className="dengi-title-main">श्री श्री श्री १०८ ष.ब्र.गुरुमुर्ती गुरुनिर्वाण</div>
+              <div className="dengi-title-sub">रुद्रपशुपती कोळेकर महास्वामीजी</div>
+              <div className="dengi-address">कोळे ता.सांगोला जि.सोलापूर</div>
+            </div>
+
+            <div className="dengi-badge-container">
+              <div className="dengi-badge">{lang === 'mr' ? 'देणगी पावती' : 'DONATION RECEIPT'}</div>
+            </div>
+
+            <div className="dengi-flex-row">
+              <div className="dengi-flex-row" style={{ width: '45%', marginBottom: 0 }}>
+                <span className="dengi-label">{t.receiptNo}</span>
+                <span className="dengi-value-red">{receiptNo}</span>
+              </div>
+              <div className="dengi-flex-row" style={{ width: '45%', marginBottom: 0 }}>
+                <span className="dengi-label">{t.dateLabel}</span>
+                <span className="dengi-value">{formattedDate}</span>
+              </div>
+            </div>
+
+            <div className="dengi-flex-row">
+              <span className="dengi-label">{t.nameLabel}</span>
+              <span className="dengi-value">{donorName}</span>
+            </div>
+
+            <div className="dengi-flex-row">
+              <span className="dengi-label">राहणार</span>
+              <span className="dengi-value">{donation.address || donation.location || 'कोळे'}</span>
+              <span className="dengi-sublabel">आपणाकडून आज रोजी देणगी</span>
+            </div>
+
+            <div className="dengi-flex-row">
+              <span className="dengi-label">{t.amountWordsLabel}</span>
+              <span className="dengi-value">{amountWords}</span>
+              <span className="dengi-sublabel">{t.receivedCashLabel}</span>
+            </div>
+
+            <div className="dengi-footer">
+              <div className="dengi-amount-box">
+                <div className="dengi-amount-symbol">₹</div>
+                <div className="dengi-amount-val">{amountValue?.toLocaleString()}</div>
+              </div>
+              <div className="dengi-thankyou">{t.thankYou}</div>
+              <div className="dengi-signature">{t.receiverSignature}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ position: 'relative' }}>
       {/* Language Toggle Button */}
@@ -498,6 +578,139 @@ const Receipt = ({ donation, isUserSide = true }) => {
       <style dangerouslySetInnerHTML={{__html: `
         @import url('https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Noto+Sans+Devanagari:wght@400;500;600;700;800;900&family=Noto+Serif+Devanagari:wght@400;500;600;700;800;900&display=swap');
         
+        .dengi-receipt-container {
+          width: 580px;
+          background-color: #f6f3eb;
+          border: 3px solid #be1e4d;
+          padding: 12px;
+          box-sizing: border-box;
+          font-family: 'Noto Sans Devanagari', 'Mukta', sans-serif;
+          color: #be1e4d;
+          margin: 0 auto;
+          border-radius: 6px;
+        }
+        .dengi-receipt-inner {
+          border-top: 4px solid #be1e4d;
+          border-bottom: 4px solid #be1e4d;
+          padding: 12px;
+          box-sizing: border-box;
+        }
+        .dengi-header {
+          text-align: center;
+          margin-bottom: 8px;
+        }
+        .dengi-mantra {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.5px;
+        }
+        .dengi-title-main {
+          font-size: 18px;
+          font-weight: 800;
+          margin: 2px 0;
+        }
+        .dengi-title-sub {
+          font-size: 16px;
+          font-weight: 800;
+          margin: 2px 0;
+        }
+        .dengi-address {
+          font-size: 13px;
+          font-weight: 700;
+          margin-bottom: 8px;
+        }
+        .dengi-badge-container {
+          display: flex;
+          justify-content: center;
+          margin-bottom: 12px;
+        }
+        .dengi-badge {
+          background-color: #be1e4d;
+          color: #ffffff;
+          padding: 4px 24px;
+          border-radius: 20px;
+          font-size: 15px;
+          font-weight: 800;
+        }
+        .dengi-flex-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          margin-bottom: 10px;
+          gap: 8px;
+        }
+        .dengi-label {
+          font-size: 12px;
+          font-weight: 700;
+          white-space: nowrap;
+          color: #be1e4d;
+        }
+        .dengi-sublabel {
+          font-size: 11px;
+          font-weight: 600;
+          white-space: nowrap;
+          color: #be1e4d;
+        }
+        .dengi-value {
+          flex-grow: 1;
+          border-bottom: 1px solid #be1e4d;
+          margin: 0 6px;
+          font-size: 13px;
+          font-weight: 700;
+          color: #1A365D;
+          padding-left: 6px;
+          font-family: 'Kalam', cursive;
+        }
+        .dengi-value-red {
+          color: #be1e4d;
+          font-size: 15px;
+          font-weight: 800;
+          margin-left: 6px;
+        }
+        .dengi-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          margin-top: 16px;
+        }
+        .dengi-amount-box {
+          display: flex;
+          border: 2px solid #be1e4d;
+          height: 36px;
+          min-width: 160px;
+          border-radius: 4px;
+          overflow: hidden;
+        }
+        .dengi-amount-symbol {
+          background-color: #be1e4d;
+          color: #ffffff;
+          font-size: 18px;
+          font-weight: 800;
+          width: 36px;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        }
+        .dengi-amount-val {
+          font-size: 16px;
+          font-weight: 800;
+          color: #1A365D;
+          display: flex;
+          align-items: center;
+          padding-left: 10px;
+          font-family: 'Kalam', cursive;
+        }
+        .dengi-thankyou {
+          font-size: 18px;
+          font-weight: 800;
+          color: #be1e4d;
+        }
+        .dengi-signature {
+          font-size: 11px;
+          font-weight: 700;
+          color: #be1e4d;
+        }
+
         .receipt-outer-container {
           width: 794px;
           height: 420px;

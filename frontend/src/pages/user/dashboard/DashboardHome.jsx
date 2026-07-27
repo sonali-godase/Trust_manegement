@@ -35,7 +35,13 @@ export const DashboardHome = () => {
         ]);
 
         if (statsRes.data?.success) {
-          setStats(statsRes.data.data);
+          const fetchedStats = statsRes.data.data || {};
+          setStats({
+            totalOrders: Number(fetchedStats.totalOrders) || 0,
+            totalDonations: Number(fetchedStats.totalDonations) || 0,
+            totalDonationAmount: Number(fetchedStats.totalDonationAmount) || 0,
+            totalAnnadaan: Number(fetchedStats.totalAnnadaan) || 0
+          });
         }
 
         const activities = [];
