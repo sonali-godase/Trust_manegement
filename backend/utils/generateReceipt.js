@@ -147,7 +147,7 @@ exports.generateReceiptPdf = (rawDonation) => {
         const catLower = String(donation.category).toLowerCase();
         if (catLower.includes('jama')) effectiveType = 'jama_pavti';
         else if (catLower.includes('shakha') || catLower.includes('branch')) effectiveType = 'shakha_pavti';
-        else if (catLower.includes('dengi')) effectiveType = 'dengi_pavti';
+        else if (catLower.includes('dengi') || catLower.includes('donation')) effectiveType = 'dengi_pavti';
       }
       if (!effectiveType) effectiveType = 'dengi_pavti';
 
@@ -164,6 +164,66 @@ exports.generateReceiptPdf = (rawDonation) => {
           if (rawBuf) return resolve(toBuffer(rawBuf));
         } catch (e) {
           console.warn("Puppeteer Shakha Pavti generation failed, falling back to PDFKit engine:", e.message);
+        }
+      } else if (effectiveType === "jama_pavti") {
+        try {
+          const fontRegularPath = path.join(__dirname, '../assets/fonts/Mangal-Regular.ttf');
+          const fontBoldPath = path.join(__dirname, '../assets/fonts/Mangal-Bold.ttf');
+          const logoPath = path.join(__dirname, '../../frontend/public/logo.png');
+          const swamijiPath = path.join(__dirname, '../../frontend/src/assets/kolekar_SP_1.jpeg');
+
+          const doc = new PDFDocument({ 
+            margin: 20, 
+            size: [595.28, 440],
+            info: { Title: 'Jama Pavati' }
+          });
+          const buffers = [];
+
+          doc.on("data", (chunk) => buffers.push(chunk));
+          doc.on("end", () => resolve(Buffer.concat(buffers)));
+          doc.on("error", (err) => reject(err));
+
+          if (fs.existsSync(fontRegularPath)) doc.registerFont('Poppins', fontRegularPath);
+          if (fs.existsSync(fontBoldPath)) doc.registerFont('Poppins-Bold', fontBoldPath);
+
+          const setRegularFont = (size) => {
+            if (fs.existsSync(fontRegularPath)) doc.font('Poppins').fontSize(size);
+            else doc.font('Helvetica').fontSize(size);
+          };
+
+          const setBoldFont = (size) => {
+            if (fs.existsSync(fontBoldPath)) doc.font('Poppins-Bold').fontSize(size);
+            else doc.font('Helvetica-Bold').fontSize(size);
+          };
+
+          const receiptDate = donation.approvalDate || donation.date || Date.now();
+          const dateStr = new Date(receiptDate).toLocaleDateString("en-IN", {
+            day: "2-digit", month: "2-digit", year: "numeric"
+          });
+          const receiptNo = donation.receiptNumber || donation.donationReference || `REC-${Date.now().toString().slice(-6)}`;
+
+          const amountMarathi = convertNumberToMarathiWords(donation.amount || 0);
+          const amountEnglish = convertNumberToEnglishWords(donation.amount || 0);
+
+          drawJamaPavti({
+            doc,
+            donation: { ...donation, donationType: 'jama_pavti' },
+            copyTitle: null,
+            yOffset: 0,
+            logoPath,
+            swamijiPath,
+            receiptNo,
+            dateStr,
+            amountMarathi,
+            amountEnglish,
+            setBoldFont,
+            setRegularFont
+          });
+
+          doc.end();
+          return;
+        } catch (e) {
+          console.warn("Jama Pavti generation failed, falling back to default PDFKit engine:", e.message);
         }
       }
 

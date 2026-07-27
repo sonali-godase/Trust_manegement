@@ -27,9 +27,11 @@ if (typeof Node === 'function' && Node.prototype) {
   };
 }
 
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "575853664482-vm3gho8gni1ifluc50pf742ulkbp4oob.apps.googleusercontent.com";
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <GoogleOAuthProvider clientId="575853664482-vm3gho8gni1ifluc50pf742ulkbp4oob.apps.googleusercontent.com">
+    <GoogleOAuthProvider clientId={googleClientId}>
       <AuthProvider>
         <App />
       </AuthProvider>

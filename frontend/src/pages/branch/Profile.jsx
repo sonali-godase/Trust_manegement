@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 const Profile = () => {
-  const { user, login } = useAuth();
+  const { user, setUser } = useAuth();
   const { i18n } = useTranslation();
   
   const [activeTab, setActiveTab] = useState('personal');
@@ -80,8 +80,8 @@ const Profile = () => {
       const res = await api.put('/branch-managers/profile', data);
       if (res.data.success) {
         setMessage({ type: 'success', text: 'Personal information updated successfully.' });
-        if (login && res.data.user) {
-          login(res.data.user);
+        if (setUser && res.data.user) {
+          setUser(res.data.user);
         }
       }
     } catch (err) {
