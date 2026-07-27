@@ -80,8 +80,10 @@ const Profile = () => {
       const res = await api.put('/branch-managers/profile', data);
       if (res.data.success) {
         setMessage({ type: 'success', text: 'Personal information updated successfully.' });
-        if (setUser && res.data.user) {
-          setUser(res.data.user);
+        const updatedUser = res.data.user || res.data.data;
+        if (setUser && updatedUser) {
+          const userWithRole = { ...user, ...updatedUser, role: updatedUser.role || user?.role || 'BranchManager' };
+          setUser(userWithRole);
         }
       }
     } catch (err) {

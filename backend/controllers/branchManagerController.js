@@ -53,8 +53,9 @@ exports.updateProfile = async (req, res) => {
 
     const userResponse = manager.toObject();
     delete userResponse.password;
+    userResponse.role = manager.role || 'BranchManager';
 
-    res.status(200).json({ success: true, message: "Profile updated successfully", user: userResponse });
+    res.status(200).json({ success: true, message: "Profile updated successfully", user: userResponse, data: userResponse });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
