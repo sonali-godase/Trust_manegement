@@ -68,23 +68,53 @@ const ReceiptHistory = ({ defaultCategory = 'All', hideTitle = false, hideCatego
     fetchReceipts();
   };
 
+  const getReceiptPdfBlob = async (receipt) => {
+    let fetchUrl;
+    if (receipt.pdfUrl && (receipt.pdfUrl.startsWith('http://') || receipt.pdfUrl.startsWith('https://'))) {
+      const resp = await fetch(receipt.pdfUrl);
+      if (!resp.ok) throw new Error("Failed to fetch receipt from media server");
+      return await resp.blob();
+    }
+    
+    if (receipt.pdfUrl && receipt.pdfUrl.startsWith('/api')) {
+      fetchUrl = receipt.pdfUrl.replace('/api', '');
+    } else if (receipt.donationId) {
+      fetchUrl = `/donations/${receipt.donationId}/receipt`;
+    } else {
+      fetchUrl = `/donations/${receipt._id}/receipt`;
+    }
+
+    const response = await api.get(fetchUrl, { responseType: 'blob' });
+    return new Blob([response.data], { type: 'application/pdf' });
+  };
+
+  const handleView = async (receipt) => {
+    const toastId = toast.loading("Opening document...");
+    try {
+      if (receipt.pdfUrl && (receipt.pdfUrl.startsWith('http://') || receipt.pdfUrl.startsWith('https://'))) {
+        window.open(receipt.pdfUrl, '_blank');
+        toast.dismiss(toastId);
+        return;
+      }
+      const blob = await getReceiptPdfBlob(receipt);
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      toast.dismiss(toastId);
+    } catch (error) {
+      console.error("Failed to view PDF:", error);
+      toast.error("Failed to load document.", { id: toastId });
+    }
+  };
+
   const handleDownload = async (receipt) => {
     const toastId = toast.loading("Downloading document...");
     try {
-      let fetchUrl;
-      if (receipt.pdfUrl && receipt.pdfUrl.startsWith('/api')) {
-        fetchUrl = receipt.pdfUrl.replace('/api', '');
-      } else {
-        const targetId = receipt.donationId || receipt._id;
-        fetchUrl = `/donations/${targetId}/receipt`;
-      }
-
-      const response = await api.get(fetchUrl, { responseType: 'blob' });
-      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const blob = await getReceiptPdfBlob(receipt);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `${receipt.category.replace(/\s+/g, '_')}_${receipt.receiptNumber}.pdf`);
+      const fileName = `${(receipt.category || 'Receipt').replace(/\s+/g, '_')}_${receipt.receiptNumber || 'REC'}.pdf`;
+      link.setAttribute('download', fileName);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -92,46 +122,63 @@ const ReceiptHistory = ({ defaultCategory = 'All', hideTitle = false, hideCatego
       toast.success("Downloaded successfully!", { id: toastId });
     } catch (error) {
       console.error("Failed to download PDF:", error);
-      toast.error("Failed to download PDF.", { id: toastId });
+      toast.error("Failed to download document.", { id: toastId });
     }
   };
 
-  const handleView = async (receipt) => {
-    const toastId = toast.loading("Loading document...");
+  const handlePrint = async (receipt) => {
+    const toastId = toast.loading("Preparing print...");
     try {
-      let fetchUrl;
-      if (receipt.pdfUrl && receipt.pdfUrl.startsWith('/api')) {
-        fetchUrl = receipt.pdfUrl.replace('/api', '');
-      } else {
-        const targetId = receipt.donationId || receipt._id;
-        fetchUrl = `/donations/${targetId}/receipt`;
+      if (receipt.pdfUrl && (receipt.pdfUrl.startsWith('http://') || receipt.pdfUrl.startsWith('https://'))) {
+        const printWin = window.open(receipt.pdfUrl, '_blank');
+        if (printWin) {
+          printWin.focus();
+        }
+        toast.dismiss(toastId);
+        return;
       }
-
-      const response = await api.get(fetchUrl, { responseType: 'blob' });
-      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const blob = await getReceiptPdfBlob(receipt);
       const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank');
+      const printWin = window.open(url, '_blank');
+      if (printWin) {
+        printWin.focus();
+      }
       toast.dismiss(toastId);
     } catch (error) {
-      console.error("Failed to load PDF:", error);
-      toast.error("Failed to load PDF.", { id: toastId });
+      console.error("Failed to print PDF:", error);
+      toast.error("Failed to print document.", { id: toastId });
     }
   };
 
-  const handleShare = (receipt) => {
-    const fullUrl = receipt.pdfUrl.startsWith('/api') 
-        ? window.location.origin + receipt.pdfUrl 
-        : receipt.pdfUrl;
-        
-    const title = `Document: ${receipt.category}`;
-    const text = `View ${receipt.category} document (No: ${receipt.receiptNumber}).`;
-    
-    if (navigator.share) {
-      navigator.share({ title, text, url: fullUrl })
-        .catch(err => console.log('Error sharing', err));
-    } else {
-      // Fallback
-      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text + " " + fullUrl)}`, '_blank');
+  const handleShare = async (receipt) => {
+    const toastId = toast.loading("Preparing link to share...");
+    try {
+      let shareUrl = receipt.pdfUrl || '';
+      if (shareUrl.startsWith('/api')) {
+        const backendUrl = import.meta.env.VITE_ASSETS_URL || (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '') : window.location.origin);
+        shareUrl = backendUrl + shareUrl.replace('/api', '');
+      } else if (!shareUrl.startsWith('http')) {
+        const targetId = receipt.donationId || receipt._id;
+        const backendUrl = import.meta.env.VITE_API_URL || `${window.location.origin}/api`;
+        shareUrl = `${backendUrl}/donations/${targetId}/receipt`;
+      }
+
+      const title = `Document: ${receipt.category || 'Receipt'}`;
+      const text = `View ${receipt.category || 'Receipt'} document (No: ${receipt.receiptNumber}).`;
+
+      toast.dismiss(toastId);
+
+      if (navigator.share) {
+        await navigator.share({ title, text, url: shareUrl });
+      } else {
+        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text + " " + shareUrl)}`, '_blank');
+      }
+    } catch (error) {
+      toast.dismiss(toastId);
+      if (error.name !== 'AbortError') {
+        const text = `Receipt No: ${receipt.receiptNumber || ''}`;
+        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+      }
     }
   };
 
@@ -274,24 +321,21 @@ const ReceiptHistory = ({ defaultCategory = 'All', hideTitle = false, hideCatego
                           <span className="text-[11px] text-gray-500 truncate max-w-[120px]">By: {receipt.generatedBy?.name || receipt.generatedBy?.fullName || receipt.generatedBy?.displayName || 'System'}</span>
                         </div>
                         <div className="flex justify-between md:justify-end gap-2 border-t border-gray-200 md:border-none pt-3 md:pt-0">
-                          {receipt.pdfUrl ? (
-                            <>
-                              <button onClick={() => handleView(receipt)} className="flex-1 md:flex-none p-2 flex items-center justify-center bg-white md:bg-transparent text-gray-600 border md:border-none border-gray-200 hover:bg-gray-100 rounded-lg shadow-sm md:shadow-none" title="View PDF">
-                                <Eye className="w-4 h-4 md:w-5 md:h-5" />
-                              </button>
-                              <button onClick={() => handleDownload(receipt)} className="flex-1 md:flex-none p-2 flex items-center justify-center bg-white md:bg-transparent text-gray-600 border md:border-none border-gray-200 hover:bg-gray-100 rounded-lg shadow-sm md:shadow-none" title="Download">
-                                <Download className="w-4 h-4 md:w-5 md:h-5" />
-                              </button>
-                              <button className="flex-1 md:flex-none p-2 flex items-center justify-center bg-white md:bg-transparent text-gray-600 border md:border-none border-gray-200 hover:bg-gray-100 rounded-lg shadow-sm md:shadow-none" title="Share" onClick={() => handleShare(receipt)}>
-                                <Share2 className="w-4 h-4 md:w-5 md:h-5" />
-                              </button>
-                              <button className="flex-1 md:flex-none p-2 flex items-center justify-center bg-indigo-50 md:bg-transparent text-indigo-600 border md:border-none border-indigo-200 hover:bg-indigo-100 rounded-lg shadow-sm md:shadow-none" title="More Info" onClick={() => setSelectedInfo(receipt)}>
-                                <Info className="w-4 h-4 md:w-5 md:h-5" />
-                              </button>
-                            </>
-                          ) : (
-                            <span className="text-xs text-gray-400 w-full text-center md:text-right py-2 md:py-0">PDF Pending</span>
-                          )}
+                          <button onClick={() => handleView(receipt)} className="flex-1 md:flex-none p-2 flex items-center justify-center bg-white md:bg-transparent text-gray-600 border md:border-none border-gray-200 hover:bg-gray-100 rounded-lg shadow-sm md:shadow-none transition-colors" title="View PDF">
+                            <Eye className="w-4 h-4 md:w-5 md:h-5 text-sky-600" />
+                          </button>
+                          <button onClick={() => handleDownload(receipt)} className="flex-1 md:flex-none p-2 flex items-center justify-center bg-white md:bg-transparent text-gray-600 border md:border-none border-gray-200 hover:bg-gray-100 rounded-lg shadow-sm md:shadow-none transition-colors" title="Download PDF">
+                            <Download className="w-4 h-4 md:w-5 md:h-5 text-emerald-600" />
+                          </button>
+                          <button onClick={() => handlePrint(receipt)} className="flex-1 md:flex-none p-2 flex items-center justify-center bg-white md:bg-transparent text-gray-600 border md:border-none border-gray-200 hover:bg-gray-100 rounded-lg shadow-sm md:shadow-none transition-colors" title="Print PDF">
+                            <Printer className="w-4 h-4 md:w-5 md:h-5 text-purple-600" />
+                          </button>
+                          <button onClick={() => handleShare(receipt)} className="flex-1 md:flex-none p-2 flex items-center justify-center bg-white md:bg-transparent text-gray-600 border md:border-none border-gray-200 hover:bg-gray-100 rounded-lg shadow-sm md:shadow-none transition-colors" title="Share Document">
+                            <Share2 className="w-4 h-4 md:w-5 md:h-5 text-amber-600" />
+                          </button>
+                          <button onClick={() => setSelectedInfo(receipt)} className="flex-1 md:flex-none p-2 flex items-center justify-center bg-indigo-50 md:bg-transparent text-indigo-600 border md:border-none border-indigo-200 hover:bg-indigo-100 rounded-lg shadow-sm md:shadow-none transition-colors" title="More Info">
+                            <Info className="w-4 h-4 md:w-5 md:h-5" />
+                          </button>
                         </div>
                       </td>
                     </tr>

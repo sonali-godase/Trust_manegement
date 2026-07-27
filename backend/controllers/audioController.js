@@ -103,12 +103,17 @@ exports.uploadDirect = async (req, res) => {
     const audioFile = req.files['audioFile'][0];
     const thumbnailFile = req.files['thumbnail'] ? req.files['thumbnail'][0] : null;
 
-    const uploadRes = await uploadToCloudinary(audioFile, 'aashram_audio', { resourceType: 'auto' });
-    const audioUrl = uploadRes ? uploadRes.url : '';
+    const uploadRes = await uploadToCloudinary(audioFile, 'aashram_audio', { resourceType: 'video' });
+    let audioUrl = uploadRes ? uploadRes.url : '';
+    if (audioUrl && audioUrl.startsWith('http://')) {
+      audioUrl = audioUrl.replace('http://', 'https://');
+    }
     let thumbnailUrl = '';
     if (thumbnailFile) {
       const thumbRes = await uploadToCloudinary(thumbnailFile, 'aashram_audio', { resourceType: 'image' });
-      if (thumbRes) thumbnailUrl = thumbRes.url;
+      if (thumbRes) {
+        thumbnailUrl = thumbRes.url.replace(/^http:\/\//, 'https://');
+      }
     }
 
     const audioTrack = await AudioTrack.create({

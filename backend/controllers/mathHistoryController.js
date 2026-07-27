@@ -14,7 +14,11 @@ exports.getAllRecords = async (req, res) => {
 // Get published records (Public view)
 exports.getPublicRecords = async (req, res) => {
   try {
-    const records = await MathHistory.find({ status: 'Published' }).sort({ order: 1, createdAt: -1 });
+    let records = await MathHistory.find({ status: 'Published' }).sort({ order: 1, createdAt: -1 });
+    // Fallback: if no records have status 'Published', return all active records
+    if (!records || records.length === 0) {
+      records = await MathHistory.find().sort({ order: 1, createdAt: -1 });
+    }
     res.status(200).json({ success: true, data: records });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
@@ -49,7 +53,7 @@ exports.createRecord = async (req, res) => {
       era,
       content,
       category: category || 'Origin',
-      status: status || 'Draft',
+      status: status || 'Published',
       order: order ? parseInt(order) : 0,
       media
     });
@@ -91,7 +95,7 @@ exports.updateRecord = async (req, res) => {
         }
       }
       if (newMedia.length > 0) {
-        media = [...media, ...newMedia];
+        media = [...newMedia, ...media]; // Put newly uploaded Cloudinary media first
       }
     }
 
@@ -100,7 +104,7 @@ exports.updateRecord = async (req, res) => {
       era,
       content,
       category,
-      status,
+      status: status || 'Published',
       order: order !== undefined ? parseInt(order) : existingRecord.order,
       media
     };

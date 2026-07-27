@@ -8,9 +8,13 @@ import api from '../../utils/api';
 
 const getMediaUrl = (url) => {
   if (!url || typeof url !== 'string' || url.includes('undefined')) return null;
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  let cleanUrl = url.trim();
+  if (cleanUrl.startsWith('http://')) {
+    cleanUrl = cleanUrl.replace('http://', 'https://');
+  }
+  if (cleanUrl.startsWith('https://')) return cleanUrl;
   const backendUrl = import.meta.env.VITE_ASSETS_URL || (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '') : "http://localhost:5000");
-  return `${backendUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+  return `${backendUrl}${cleanUrl.startsWith('/') ? '' : '/'}${cleanUrl}`;
 };
 
 const MathHistory = () => {
@@ -167,7 +171,7 @@ const MathHistory = () => {
                                         <img 
                                           src={mediaUrl} 
                                           alt={record.title} 
-                                          onError={(e) => { e.target.style.display = 'none'; }}
+                                          onError={(e) => { e.target.onerror = null; e.target.src = '/about_images/kolekar_real_3.jpg'; }}
                                           className="w-full h-full object-cover object-[50%_20%] group-hover:scale-105 transition-transform duration-[2s] ease-out" 
                                         />
                                     ) : mainMedia.type === 'video' ? (

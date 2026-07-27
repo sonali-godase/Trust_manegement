@@ -3,6 +3,24 @@ import { FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaYoutube, FaMusic } from 'r
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../utils/api';
 
+const getAudioUrl = (rawUrl) => {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  let url = rawUrl.trim();
+  if (url.startsWith('http://')) {
+    url = url.replace('http://', 'https://');
+  }
+  if (url.startsWith('https://')) return url;
+  const backendUrl = import.meta.env.VITE_ASSETS_URL || (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '') : "http://localhost:5000");
+  return `${backendUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
+const extractYoutubeId = (url) => {
+  if (!url) return null;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : null;
+};
+
 const AudioPlayerWithLyrics = () => {
   const [track, setTrack] = useState(null);
   const [lyrics, setLyrics] = useState([]);
@@ -21,16 +39,6 @@ const AudioPlayerWithLyrics = () => {
     fetchActiveTrack();
   }, []);
 
-  // Auto-scroll lyrics smoothly to the center
-  useEffect(() => {
-    if (activeLyricRef.current && lyricsContainerRef.current) {
-      activeLyricRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-      });
-    }
-  }, [activeLyricIndex]);
-
   const fetchActiveTrack = async () => {
     try {
       const res = await api.get('/audio/active');
@@ -48,7 +56,6 @@ const AudioPlayerWithLyrics = () => {
   };
 
   const parseTime = (timeString) => {
-    // 00:00:00.000 or 00:00.000
     const parts = timeString.split(':');
     let seconds = 0;
     if (parts.length === 3) {
@@ -70,8 +77,6 @@ const AudioPlayerWithLyrics = () => {
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
-        if (!line || line === 'WEBVTT') continue;
-
         if (line.includes('-->')) {
           const times = line.split('-->');
           currentCue = {
@@ -79,21 +84,10 @@ const AudioPlayerWithLyrics = () => {
             end: parseTime(times[1].trim()),
             text: ''
           };
-        } else if (currentCue) {
-          if (line.match(/^[0-9]+$/)) {
-            continue; // Skip cue identifiers
-          }
-          currentCue.text += (currentCue.text ? ' ' : '') + line;
-          
-          // Look ahead to see if next line is empty or a timestamp (end of cue)
-          if (i + 1 >= lines.length || !lines[i + 1].trim() || lines[i+1].includes('-->')) {
-             if(currentCue.text.trim()) {
-                // remove HTML tags sometimes present in auto-subs (like <c>...</c>)
-                currentCue.text = currentCue.text.replace(/<[^>]+>/g, '');
-                parsedLyrics.push(currentCue);
-             }
-             currentCue = null;
-          }
+        } else if (currentCue && line !== '' && !line.startsWith('WEBVTT') && !line.startsWith('NOTE')) {
+          currentCue.text = currentCue.text ? `${currentCue.text} ${line}` : line;
+          parsedLyrics.push(currentCue);
+          currentCue = null;
         }
       }
       setLyrics(parsedLyrics);
@@ -103,12 +97,21 @@ const AudioPlayerWithLyrics = () => {
   };
 
   const togglePlay = () => {
+    if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
+      setIsPlaying(false);
     } else {
-      audioRef.current.play();
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => setIsPlaying(true))
+          .catch((err) => {
+            console.warn("Audio play prevented:", err.message);
+            setIsPlaying(false);
+          });
+      }
     }
-    setIsPlaying(!isPlaying);
   };
 
   const handleTimeUpdate = () => {
@@ -116,16 +119,12 @@ const AudioPlayerWithLyrics = () => {
     const time = audioRef.current.currentTime;
     setCurrentTime(time);
 
-    // Find active lyric
     const index = lyrics.findIndex(lyric => time >= lyric.start && time <= lyric.end);
     if (index !== -1 && index !== activeLyricIndex) {
       setActiveLyricIndex(index);
-      
-      // Auto scroll
       if (activeLyricRef.current && lyricsContainerRef.current) {
         const container = lyricsContainerRef.current;
         const element = activeLyricRef.current;
-        
         container.scrollTo({
           top: element.offsetTop - container.offsetHeight / 2 + element.offsetHeight / 2,
           behavior: 'smooth'
@@ -136,7 +135,9 @@ const AudioPlayerWithLyrics = () => {
 
   const handleSeek = (e) => {
     const time = parseFloat(e.target.value);
-    audioRef.current.currentTime = time;
+    if (audioRef.current) {
+      audioRef.current.currentTime = time;
+    }
     setCurrentTime(time);
   };
 
@@ -147,26 +148,39 @@ const AudioPlayerWithLyrics = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  if (loading) return null; // Don't show anything if loading
-  if (!track) return null; // Don't show anything if no active track
+  if (loading) return null;
+  if (!track) return null;
+
+  const audioSrc = getAudioUrl(track.audioUrl);
+  const youtubeId = extractYoutubeId(track.audioUrl || track.originalYoutubeUrl);
+  const isYoutubeTrack = Boolean(youtubeId) || (track.sourceType === 'youtube' && !audioSrc.includes('cloudinary.com'));
 
   return (
     <div className="w-full max-w-5xl mx-auto my-6 md:my-12 bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl shadow-xl overflow-hidden flex flex-col-reverse md:flex-row relative border border-orange-100">
       
-      {/* Background decoration */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-orange-300 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-blob"></div>
       <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-300 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-blob animation-delay-2000"></div>
 
-      <audio 
-        ref={audioRef}
-        src={track.audioUrl}
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={(e) => setDuration(e.target.duration)}
-        onEnded={() => setIsPlaying(false)}
-        muted={isMuted}
-      />
+      {isYoutubeTrack && youtubeId ? (
+        <div className="hidden">
+          <audio ref={audioRef} />
+        </div>
+      ) : (
+        <audio 
+          ref={audioRef}
+          src={audioSrc}
+          onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={(e) => setDuration(e.target.duration)}
+          onEnded={() => setIsPlaying(false)}
+          onError={(e) => console.warn("Audio element error:", e)}
+          muted={isMuted}
+        >
+          <source src={audioSrc} type="audio/mpeg" />
+          <source src={audioSrc} type="audio/mp3" />
+          <source src={audioSrc} type="audio/ogg" />
+        </audio>
+      )}
 
-      {/* Left side: Player Controls */}
       <div className="w-full md:w-5/12 p-5 sm:p-8 md:p-10 flex flex-col justify-center relative z-10 border-t md:border-t-0 md:border-r border-orange-200/50 backdrop-blur-sm">
         
         <div className="mb-6 md:mb-8 text-center md:text-left">
@@ -251,6 +265,16 @@ const AudioPlayerWithLyrics = () => {
                 {lyric.text}
               </motion.div>
             ))}
+          </div>
+        ) : isYoutubeTrack && youtubeId ? (
+          <div className="w-full h-full overflow-hidden bg-black flex items-center justify-center border-b md:border-b-0 md:border-l border-orange-100 min-h-[250px]">
+            <iframe
+              src={`https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0`}
+              title={track.title}
+              className="w-full h-full min-h-[250px] border-0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            ></iframe>
           </div>
         ) : track.thumbnailUrl ? (
           <div className="w-full h-full overflow-hidden group bg-stone-50 flex items-center justify-center border-b md:border-b-0 md:border-l border-orange-100">

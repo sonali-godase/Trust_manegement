@@ -26,15 +26,6 @@ exports.drawJamaPavti = (ctx) => {
     doc.restore();
   }
 
-  // Draw Swamiji Photos on Left & Right Header
-  if (swamijiPath && fs.existsSync(swamijiPath)) {
-    doc.image(swamijiPath, paddingX + 15, yOffset + 20, { width: 50, height: 65 });
-  }
-  const swamijiPath2 = path.join(__dirname, '../../frontend/src/assets/kolekar_SP_2.jpeg');
-  if (fs.existsSync(swamijiPath2)) {
-    doc.image(swamijiPath2, paddingX + rectW - 65, yOffset + 20, { width: 50, height: 65 });
-  }
-
   // 2. Header
   setBoldFont(16);
   doc.fillColor(pinkRed).text("श्री गुरुमूर्ती रुद्रपशुपती लिंगायत मठ निमसोड, मिरज", paddingX, yOffset + 25, { width: rectW, align: 'center' });

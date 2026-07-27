@@ -190,6 +190,9 @@ const Receipt = ({ donation, isUserSide = true }) => {
   const amountWords = amountWordsRaw;
   const purposeText = purposeTextRaw;
 
+  const receiptCategory = (donation.category || donation.type || donation.receiptType || donation.donationType || '').toLowerCase();
+  const showSwamiji = receiptCategory.includes('shakha') || receiptCategory.includes('branch');
+
   const toggleLanguage = () => {
     setLang(lang === 'mr' ? 'en' : 'mr');
   };
@@ -340,9 +343,13 @@ const Receipt = ({ donation, isUserSide = true }) => {
         {/* Top Header Row with Swamiji Photos */}
         <div style={{ padding: '8px 14px 0 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', boxSizing: 'border-box' }}>
           {/* Left Swamiji */}
-          <div className="swamiji-photo-frame">
-            <img src="/guru_swamiji.png" alt="Guru Swamiji" className="swamiji-photo" />
-          </div>
+          {showSwamiji ? (
+            <div className="swamiji-photo-frame">
+              <img src="/guru_swamiji.png" alt="Guru Swamiji" className="swamiji-photo" />
+            </div>
+          ) : (
+            <div style={{ width: '52px', height: '65px' }}></div>
+          )}
 
           {/* Middle Header Text */}
           <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0 8px', width: '320px', boxSizing: 'border-box' }}>
@@ -374,9 +381,13 @@ const Receipt = ({ donation, isUserSide = true }) => {
           </div>
 
           {/* Right Swamiji */}
-          <div className="swamiji-photo-frame">
-            <img src="/current_swamiji.png" alt="Current Swamiji" className="swamiji-photo" />
-          </div>
+          {showSwamiji ? (
+            <div className="swamiji-photo-frame">
+              <img src="/current_swamiji.png" alt="Current Swamiji" className="swamiji-photo" />
+            </div>
+          ) : (
+            <div style={{ width: '52px', height: '65px' }}></div>
+          )}
         </div>
 
         {/* Metadata Row */}
