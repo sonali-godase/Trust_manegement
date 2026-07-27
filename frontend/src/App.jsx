@@ -126,10 +126,29 @@ const RoleProtectedRoute = ({ children, allowedRoles }) => {
     if (user.role === 'Devotee') return <Navigate to="/devotee/dashboard" />;
     if (user.role === 'BranchManager') return <Navigate to="/branch/dashboard" />;
     if (user.role === 'Accountant') return <Navigate to="/accountant/dashboard" />;
+    if (user.role === 'DocumentHandler' || user.role === 'document_admin') return <Navigate to="/document-handler/dashboard" />;
     return <Navigate to="/" />;
   }
 
   return <Layout user={user}>{children}</Layout>;
+};
+
+// Smart Profile Redirect Helper
+const ProfileRedirect = () => {
+  const { user, loading } = useAuth();
+  if (loading) return (
+    <div className="h-screen flex flex-col items-center justify-center bg-gray-50 text-indigo-600 font-bold">
+      <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-3"></div>
+      Loading Profile...
+    </div>
+  );
+  if (!user) return <Navigate to="/login" />;
+  if (user.role === 'Admin') return <Navigate to="/admin/profile" />;
+  if (user.role === 'Trustee') return <Navigate to="/trustee/profile" />;
+  if (user.role === 'BranchManager') return <Navigate to="/branch/profile" />;
+  if (user.role === 'Accountant') return <Navigate to="/accountant/profile" />;
+  if (user.role === 'DocumentHandler' || user.role === 'document_admin') return <Navigate to="/document-handler/profile" />;
+  return <Navigate to="/devotee/settings" />;
 };
 
 // Full screen dashboard wrapper for non-sidebar roles if needed
@@ -266,8 +285,12 @@ function AppRoutes() {
           <Route path="/devotee/donations" element={<DevoteeLayout allowedRoles={['Devotee']}><DevoteeDonations /></DevoteeLayout>} />
           <Route path="/devotee/annadaan" element={<DevoteeLayout allowedRoles={['Devotee']}><DevoteeAnnadaan /></DevoteeLayout>} />
           <Route path="/devotee/settings" element={<DevoteeLayout allowedRoles={['Devotee']}><DevoteeSettings /></DevoteeLayout>} />
+          <Route path="/devotee/profile" element={<DevoteeLayout allowedRoles={['Devotee']}><DevoteeSettings /></DevoteeLayout>} />
           <Route path="/devotee/vanshawal" element={<DevoteeLayout allowedRoles={['Devotee']}><DevoteeVanshawal /></DevoteeLayout>} />
 
+          {/* Generic Profile Redirect Routes */}
+          <Route path="/profile" element={<ProfileRedirect />} />
+          <Route path="/user/profile" element={<ProfileRedirect />} />
 
           {/* Accountant Protected Routes */}
           <Route path="/accountant/dashboard" element={<RoleProtectedRoute allowedRoles={['Accountant']}><AccountantDashboard /></RoleProtectedRoute>} />
