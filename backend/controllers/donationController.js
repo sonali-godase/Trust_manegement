@@ -352,8 +352,8 @@ exports.approveDonation = async (req, res) => {
       donation.receiptNumber = await generateReceiptRef(donation.donationType);
     }
 
-    // Single-source generation: generate PDF & upload to Cloudinary
-    let pdfBuffer;
+    // Single-source generation: generate PDF & upload to Cloudinary (with fail-safe fallbacks)
+    let pdfBuffer = null;
     try {
       const rawBuf = await generateReceiptPdf(donation.toObject ? donation.toObject() : donation);
       if (rawBuf) {
@@ -364,13 +364,16 @@ exports.approveDonation = async (req, res) => {
         else pdfBuffer = Buffer.from(rawBuf);
       }
     } catch (genErr) {
-      console.error("PDF generation failed on approval:", genErr);
-      return res.status(500).json({ success: false, message: "Failed to generate receipt PDF.", error: genErr.message });
+      console.warn("PDF generation warning on approval (will generate on-demand):", genErr.message);
     }
 
     let uploadRes = null;
     if (pdfBuffer) {
-      uploadRes = await uploadToCloudinary(pdfBuffer, "receipts", { resourceType: "auto" });
+      try {
+        uploadRes = await uploadToCloudinary(pdfBuffer, "receipts", { resourceType: "auto" });
+      } catch (cloudErr) {
+        console.warn("Cloudinary upload failed on approval, using local API fallback URL:", cloudErr.message);
+      }
     }
 
     if (uploadRes && uploadRes.url) {

@@ -177,7 +177,7 @@ const DocumentAdminDeletionRequests = () => {
                       <td className="p-3 md:px-6 md:py-4 md:text-right block md:table-cell bg-slate-50 md:bg-transparent rounded-b-xl md:rounded-none">
                         <div className="flex justify-between items-center w-full">
                           <span className="md:hidden text-xs text-slate-500 uppercase font-semibold px-1">Actions</span>
-                          <div className="flex items-center justify-end w-full md:w-auto gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex items-center justify-end w-full md:w-auto gap-2 opacity-100">
                             <button onClick={() => openViewModal(doc)} className="p-2 w-10 h-10 md:w-auto md:h-auto flex items-center justify-center bg-white md:bg-transparent border border-slate-200 md:border-none text-indigo-600 hover:bg-indigo-50 rounded-lg tooltip transition-colors shadow-sm md:shadow-none" title="View">
                               <FiEye />
                             </button>
