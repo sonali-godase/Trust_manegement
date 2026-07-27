@@ -141,14 +141,24 @@ exports.generateReceiptPdf = (rawDonation) => {
         return Buffer.from(buf);
       };
 
-      if (donation.donationType === "dengi_pavti" || !donation.donationType) {
+      // Resolve donationType from donationType property or category fallback
+      let effectiveType = donation.donationType;
+      if (!effectiveType && donation.category) {
+        const catLower = String(donation.category).toLowerCase();
+        if (catLower.includes('jama')) effectiveType = 'jama_pavti';
+        else if (catLower.includes('shakha') || catLower.includes('branch')) effectiveType = 'shakha_pavti';
+        else if (catLower.includes('dengi')) effectiveType = 'dengi_pavti';
+      }
+      if (!effectiveType) effectiveType = 'dengi_pavti';
+
+      if (effectiveType === "dengi_pavti") {
         try {
           const rawBuf = await generateDengiPavtiPdf(donation);
           return resolve(toBuffer(rawBuf));
         } catch (e) {
           return reject(e);
         }
-      } else if (donation.donationType === "shakha_pavti") {
+      } else if (effectiveType === "shakha_pavti") {
         try {
           const rawBuf = await generateShakhaPavtiPdf(donation);
           return resolve(toBuffer(rawBuf));

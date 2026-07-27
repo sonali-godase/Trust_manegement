@@ -76,19 +76,40 @@ const ReceiptHistory = ({ defaultCategory = 'All', hideTitle = false, hideCatego
 
   const getPdfUrl = (receipt) => {
     if (!receipt) return '';
+    if (receipt.pdfUrl && (receipt.pdfUrl.startsWith('http://') || receipt.pdfUrl.startsWith('https://'))) {
+      return receipt.pdfUrl;
+    }
     const targetId = receipt.donationId || receipt._id;
     const token = sessionStorage.getItem("token") || localStorage.getItem("token") || sessionStorage.getItem("documentAdminToken") || localStorage.getItem("documentAdminToken");
-    const backendUrl = import.meta.env.VITE_API_URL || `${window.location.origin}/api`;
-    return `${backendUrl}/donations/${targetId}/receipt?token=${token || ''}`;
+    let baseUrl = api.defaults.baseURL || import.meta.env.VITE_API_URL || '';
+    if (!baseUrl) {
+      baseUrl = `${window.location.origin}/api`;
+    }
+    if (!baseUrl.endsWith('/api') && !baseUrl.endsWith('/api/')) {
+      baseUrl = `${baseUrl.replace(/\/$/, '')}/api`;
+    }
+    return `${baseUrl}/donations/${targetId}/receipt?token=${token || ''}`;
   };
 
   const getReceiptPdfBlob = async (receipt) => {
     const targetId = receipt.donationId || receipt._id;
-    const response = await api.get(`/donations/${targetId}/receipt`, { responseType: 'blob' });
-    if (response.data.type === 'text/html' || (typeof response.data.type === 'string' && response.data.type.includes('html'))) {
-      throw new Error("Invalid response format: Received HTML page instead of PDF document.");
+    try {
+      const response = await api.get(`/donations/${targetId}/receipt`, { responseType: 'blob', timeout: 15000 });
+      if (response.data.type === 'text/html' || (typeof response.data.type === 'string' && response.data.type.includes('html'))) {
+        throw new Error("Invalid response format: Received HTML page instead of PDF document.");
+      }
+      return new Blob([response.data], { type: 'application/pdf' });
+    } catch (err) {
+      console.warn("Backend receipt API fetch encountered error, attempting direct stored URL fetch...", err.message);
+      if (receipt.pdfUrl && (receipt.pdfUrl.startsWith('http://') || receipt.pdfUrl.startsWith('https://'))) {
+        const cloudRes = await fetch(receipt.pdfUrl);
+        if (cloudRes.ok) {
+          const blob = await cloudRes.blob();
+          return new Blob([blob], { type: 'application/pdf' });
+        }
+      }
+      throw err;
     }
-    return new Blob([response.data], { type: 'application/pdf' });
   };
 
   const handleView = async (receipt) => {

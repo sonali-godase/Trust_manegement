@@ -247,36 +247,46 @@ exports.downloadReceipt = async (req, res) => {
       return res.status(404).json({ success: false, message: "Receipt is only available after donation approval." });
     }
 
-    // Return or redirect to stored Cloudinary PDF URL if available
+    // Proxy fetch stored Cloudinary PDF URL if available
     if (donation.receiptPdfUrl && (donation.receiptPdfUrl.startsWith('http://') || donation.receiptPdfUrl.startsWith('https://'))) {
       if (req.query.json === 'true') {
         return res.status(200).json({ success: true, pdfUrl: donation.receiptPdfUrl });
       }
-      return res.redirect(donation.receiptPdfUrl);
+      try {
+        const axios = require('axios');
+        const cloudResponse = await axios.get(donation.receiptPdfUrl, { responseType: 'arraybuffer' });
+        if (cloudResponse.status === 200 && cloudResponse.data) {
+          res.setHeader("Content-Type", "application/pdf");
+          res.setHeader("Content-Disposition", `inline; filename=Donation_Receipt_${donation.donationReference || id}.pdf`);
+          return res.send(Buffer.from(cloudResponse.data));
+        }
+      } catch (cloudFetchErr) {
+        console.warn("Direct Cloudinary PDF proxy fetch encountered issue/401, falling back to generator:", cloudFetchErr.message);
+      }
     }
 
-    // Otherwise generate once, upload to Cloudinary, save URL, and return/redirect
-    const pdfBuffer = await generateReceiptPdf(donation.toObject());
-    const uploadRes = await uploadToCloudinary(pdfBuffer, "receipts", { resourceType: "auto" });
+    // Otherwise generate once, upload to Cloudinary, save URL, and stream PDF bytes
+    const rawPdf = await generateReceiptPdf(typeof donation.toObject === 'function' ? donation.toObject() : donation);
+    const pdfBuffer = Buffer.isBuffer(rawPdf) ? rawPdf : Buffer.from(rawPdf.buffer || rawPdf);
 
-    if (uploadRes && uploadRes.url) {
-      donation.receiptPdfUrl = uploadRes.url;
-      donation.receiptPublicId = uploadRes.publicId;
-      donation.receiptGeneratedAt = new Date();
-      await donation.save().catch(e => console.warn("Saved Cloudinary URL warning:", e.message));
-
-      if (req.query.json === 'true') {
-        return res.status(200).json({ success: true, pdfUrl: uploadRes.url });
+    try {
+      const uploadRes = await uploadToCloudinary(pdfBuffer, "receipts", { resourceType: "auto" });
+      if (uploadRes && uploadRes.url) {
+        donation.receiptPdfUrl = uploadRes.url;
+        donation.receiptPublicId = uploadRes.publicId;
+        donation.receiptGeneratedAt = new Date();
+        await donation.save().catch(e => console.warn("Saved Cloudinary URL warning:", e.message));
       }
-      return res.redirect(uploadRes.url);
+    } catch (cloudErr) {
+      console.warn("Cloudinary upload warning:", cloudErr.message);
     }
 
     if (req.query.json === 'true') {
-      return res.status(200).json({ success: true, pdfUrl: `/api/donations/${donation._id}/receipt` });
+      return res.status(200).json({ success: true, pdfUrl: donation.receiptPdfUrl || `/api/user/my-donations/${donation._id}/receipt` });
     }
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename=receipt_${id}.pdf`);
+    res.setHeader("Content-Disposition", `inline; filename=Donation_Receipt_${donation.donationReference || id}.pdf`);
     return res.send(pdfBuffer);
   } catch (err) {
     console.error("[userDashboard][ERROR] downloadReceipt:", err.message);
@@ -309,7 +319,7 @@ exports.downloadAnnadaanReceipt = async (req, res) => {
       return res.status(403).json({ success: false, message: "Unauthorized to access this receipt." });
     }
 
-    const pdfBuffer = await generateReceiptPdf({
+    const rawPdf = await generateReceiptPdf({
       ...annadaan.toObject(),
       donorName: annadaan.name,
       amount: "Annadaan Seva",
@@ -318,6 +328,7 @@ exports.downloadAnnadaanReceipt = async (req, res) => {
       paymentApp: "N/A",
       receiptNumber: `ANN-${id.substring(0, 8).toUpperCase()}`,
     });
+    const pdfBuffer = Buffer.isBuffer(rawPdf) ? rawPdf : Buffer.from(rawPdf.buffer || rawPdf);
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=annadaan_receipt_${id}.pdf`);

@@ -124,6 +124,10 @@ export const MyDonations = () => {
       setDownloadingId(id);
       const res = await downloadDonationReceipt(id);
       
+      if (res.data.type === 'text/html' || (typeof res.data.type === 'string' && res.data.type.includes('html'))) {
+        throw new Error("Receipt document not available yet or error generating PDF.");
+      }
+
       const blob = new Blob([res.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       
@@ -139,7 +143,7 @@ export const MyDonations = () => {
       toast.success("Receipt downloaded successfully!");
     } catch (err) {
       console.error("Receipt download error:", err);
-      toast.error("Failed to download receipt.");
+      toast.error(err.message || "Failed to download receipt.");
     } finally {
       setDownloadingId(null);
     }
