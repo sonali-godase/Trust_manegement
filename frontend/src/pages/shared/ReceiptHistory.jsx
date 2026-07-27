@@ -3,6 +3,7 @@ import api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 import { Search, Download, Share2, Printer, Eye, Info, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Receipt from '../../components/Receipt';
 
 const ReceiptHistory = ({ defaultCategory = 'All', hideTitle = false, hideCategoryFilter = false }) => {
   const [receipts, setReceipts] = useState([]);
@@ -15,6 +16,7 @@ const ReceiptHistory = ({ defaultCategory = 'All', hideTitle = false, hideCatego
     year: new Date().getFullYear().toString()
   });
   const [selectedInfo, setSelectedInfo] = useState(null);
+  const [viewReceiptModal, setViewReceiptModal] = useState(null);
   const { user } = useAuth();
 
   const [showFilters, setShowFilters] = useState(false);
@@ -25,23 +27,23 @@ const ReceiptHistory = ({ defaultCategory = 'All', hideTitle = false, hideCatego
   } else if (user?.role === 'BranchManager') {
     categories = ['All', 'Branch Donation', 'Annadan', 'Prasad'];
   }
-  
-  const months = [
-    { value: '', label: 'All Months' },
-    { value: '1', label: 'January' },
-    { value: '2', label: 'February' },
-    { value: '3', label: 'March' },
-    { value: '4', label: 'April' },
-    { value: '5', label: 'May' },
-    { value: '6', label: 'June' },
-    { value: '7', label: 'July' },
-    { value: '8', label: 'August' },
-    { value: '9', label: 'September' },
-    { value: '10', label: 'October' },
-    { value: '11', label: 'November' },
-    { value: '12', label: 'December' },
-  ];
-  const years = Array.from({length: 5}, (_, i) => (new Date().getFullYear() - i).toString());
+
+  const formatReceiptForComponent = (receipt) => {
+    if (!receipt) return null;
+    return {
+      _id: receipt.donationId || receipt._id,
+      receiptNumber: receipt.receiptNumber,
+      donationReference: receipt.receiptNumber,
+      donorName: receipt.dynamicData?.donorName || receipt.dynamicData?.name || receipt.dynamicData?.subject || 'Devotee',
+      amount: receipt.dynamicData?.amount || 0,
+      date: receipt.createdAt || receipt.date,
+      category: receipt.category,
+      type: receipt.category,
+      donationType: receipt.category?.toLowerCase().includes('jama') ? 'jama_pavti' : (receipt.category?.toLowerCase().includes('shakha') ? 'shakha_pavti' : 'dengi_pavti'),
+      message: receipt.dynamicData?.message || receipt.dynamicData?.purpose || receipt.category,
+      branchId: receipt.branchId
+    };
+  };
 
   const fetchReceipts = async () => {
     try {
@@ -88,22 +90,8 @@ const ReceiptHistory = ({ defaultCategory = 'All', hideTitle = false, hideCatego
     return new Blob([response.data], { type: 'application/pdf' });
   };
 
-  const handleView = async (receipt) => {
-    const toastId = toast.loading("Opening document...");
-    try {
-      if (receipt.pdfUrl && (receipt.pdfUrl.startsWith('http://') || receipt.pdfUrl.startsWith('https://'))) {
-        window.open(receipt.pdfUrl, '_blank');
-        toast.dismiss(toastId);
-        return;
-      }
-      const blob = await getReceiptPdfBlob(receipt);
-      const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      toast.dismiss(toastId);
-    } catch (error) {
-      console.error("Failed to view PDF:", error);
-      toast.error("Failed to load document.", { id: toastId });
-    }
+  const handleView = (receipt) => {
+    setViewReceiptModal(receipt);
   };
 
   const handleDownload = async (receipt) => {
@@ -272,12 +260,12 @@ const ReceiptHistory = ({ defaultCategory = 'All', hideTitle = false, hideCatego
               </thead>
               <tbody className="block md:table-row-group w-full divide-y divide-gray-100">
                 {loading ? (
-                  <tr><td colSpan="6" className="text-center p-8 text-gray-500">Loading documents...</td></tr>
+                  <tr><td colSpan="7" className="text-center p-8 text-gray-500">Loading documents...</td></tr>
                 ) : receipts.length === 0 ? (
-                  <tr><td colSpan="6" className="text-center p-8 text-gray-500">No documents found matching filters</td></tr>
+                  <tr><td colSpan="7" className="text-center p-8 text-gray-500">No documents found matching filters</td></tr>
                 ) : (
                   receipts.map(receipt => (
-                    <tr key={receipt._id} className="flex flex-col md:table-row w-full bg-white md:bg-transparent border border-gray-100 md:border-b md:border-x-0 md:border-t-0 md:border-gray-200 rounded-xl md:rounded-none mb-4 md:mb-0 shadow-sm md:shadow-none hover:bg-gray-50 overflow-hidden transition">
+                    <tr key={receipt._id} className="flex flex-col md:table-row w-full bg-white md:bg-transparent border border-gray-100 md:border-b md:border-x-0 md:border-t-0 md:border-gray-200 rounded-xl md:rounded-none mb-4 md:mb-0 shadow-sm md:shadow-none hover:bg-gray-50/80 overflow-hidden transition cursor-pointer" onClick={() => handleView(receipt)}>
                       {/* Mobile Card Top & Desktop ID */}
                       <td className="p-3 md:p-6 flex flex-col md:table-cell w-full border-b border-gray-50 md:border-none">
                         <div className="flex md:hidden justify-between items-start mb-3">
@@ -315,7 +303,7 @@ const ReceiptHistory = ({ defaultCategory = 'All', hideTitle = false, hideCatego
                         {receipt.generatedBy?.name || receipt.generatedBy?.fullName || receipt.generatedBy?.displayName || 'System'}
                       </td>
                       {/* Mobile Footer & Desktop Actions */}
-                      <td className="p-3 md:p-6 block md:table-cell bg-gray-50 md:bg-transparent rounded-b-xl md:rounded-none">
+                      <td className="p-3 md:p-6 block md:table-cell bg-gray-50 md:bg-transparent rounded-b-xl md:rounded-none" onClick={(e) => e.stopPropagation()}>
                         <div className="flex md:hidden justify-between items-center mb-3 px-1">
                           <span className="text-[11px] text-gray-500 font-medium bg-white px-2 py-1 rounded border border-gray-200">{new Date(receipt.createdAt).toLocaleDateString()}</span>
                           <span className="text-[11px] text-gray-500 truncate max-w-[120px]">By: {receipt.generatedBy?.name || receipt.generatedBy?.fullName || receipt.generatedBy?.displayName || 'System'}</span>
@@ -346,6 +334,47 @@ const ReceiptHistory = ({ defaultCategory = 'All', hideTitle = false, hideCatego
           </div>
         </div>
       </div>
+
+      {/* Receipt View Modal */}
+      {viewReceiptModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-gray-100">
+            <div className="p-4 sm:p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/80">
+              <div>
+                <h2 className="text-lg sm:text-xl font-black text-gray-900 flex items-center gap-2">
+                  <span>Receipt Preview</span>
+                  <span className="text-xs bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full font-bold">{viewReceiptModal.receiptNumber}</span>
+                </h2>
+                <p className="text-xs text-gray-500 font-medium">Category: {viewReceiptModal.category}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => handleDownload(viewReceiptModal)} className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                  <Download size={15} /> Download PDF
+                </button>
+                <button onClick={() => handlePrint(viewReceiptModal)} className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                  <Printer size={15} /> Print
+                </button>
+                <button onClick={() => setViewReceiptModal(null)} className="p-2 text-gray-400 hover:text-gray-800 rounded-full hover:bg-gray-200 transition">
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 sm:p-8 overflow-y-auto flex justify-center bg-gray-100/50">
+              <div className="transform scale-[0.85] sm:scale-100 origin-top">
+                <Receipt donation={formatReceiptForComponent(viewReceiptModal)} isUserSide={false} />
+              </div>
+            </div>
+
+            <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500">
+              <span>Date: {new Date(viewReceiptModal.createdAt || Date.now()).toLocaleDateString()}</span>
+              <button onClick={() => setViewReceiptModal(null)} className="px-5 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-bold transition">
+                Close Preview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Info Modal */}
       {selectedInfo && (
